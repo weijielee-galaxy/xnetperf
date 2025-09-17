@@ -26,9 +26,10 @@ func GenerateFullMeshScript(cfg *Config) {
 	fmt.Println(allServerHostName)
 
 	num := 1
-	port := cfg.StartPort
+	// port := cfg.StartPort
 
 	for _, Server := range allServerHostName {
+		port := cfg.StartPort
 		command := fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1", "bond0")
 
 		// 2. Create the command to be executed locally: ssh <hostname> "<command>"
@@ -41,28 +42,28 @@ func GenerateFullMeshScript(cfg *Config) {
 			fmt.Printf("Error executing command on %s: %v\nOutput: %s\n", Server, err, string(output))
 		}
 		fmt.Println("Output from", Server, ":", string(output))
-		for _, hcaClient := range cfg.Client.Hca {
+		for _, hcaServer := range cfg.Client.Hca {
 			var serverScriptContent, clientScriptContent string
 
-			serverScriptFileName := fmt.Sprintf("streamScript/%s_%s_server_fullmesh.sh", Server, hcaClient)
+			serverScriptFileName := fmt.Sprintf("streamScript/%s_%s_server_fullmesh.sh", Server, hcaServer)
 			// serverScriptContent := "#!/bin/bash\n"
 
-			clientScriptFileName := fmt.Sprintf("streamScript/%s_%s_client_fullmesh.sh", Server, hcaClient)
+			clientScriptFileName := fmt.Sprintf("streamScript/%s_%s_client_fullmesh.sh", Server, hcaServer)
 			// clientScriptContent := "#!/bin/bash\n"
 
-			fmt.Println("Generating scripts for Server:", Server, "Client HCA:", hcaClient)
+			fmt.Println("Generating scripts for Server:", Server, "Client HCA:", hcaServer)
 			for _, allHost := range allServerHostName {
 				if allHost == Server {
 					continue
 				}
-				for _, hca := range cfg.Server.Hca {
-					fmt.Println("num:", num, "Server HCA:", Server, "Server HCA:", hca, port)
-					fmt.Println("num:", num, "client HCA:", allHost, "Client HCA:", hca, port, Server)
+				for _, hcaClient := range cfg.Server.Hca {
+					fmt.Println("num:", num, "Server HCA:", Server, "Server HCA:", hcaClient, port)
+					fmt.Println("num:", num, "client HCA:", allHost, "Client HCA:", hcaClient, port, Server)
 					port++
 					num++
 					// Append the command to scriptContent instead of overwriting
-					serverScriptContent += fmt.Sprintf("ssh %s ib_write_bw -d %s --run_infinitely -m %d -p %d &\n", Server, hca, cfg.MessageSizeBytes, port-1)
-					clientScriptContent += fmt.Sprintf("ssh %s ib_write_bw -d %s --run_infinitely -m %d -p %d  %s &\n", allHost, hca, cfg.MessageSizeBytes, port-1, strings.TrimSpace(string(output)))
+					serverScriptContent += fmt.Sprintf("ssh %s ib_write_bw -d %s --run_infinitely -m %d -p %d &\n", Server, hcaServer, cfg.MessageSizeBytes, port-1)
+					clientScriptContent += fmt.Sprintf("ssh %s ib_write_bw -d %s --run_infinitely -m %d -p %d  %s &\n", allHost, hcaClient, cfg.MessageSizeBytes, port-1, strings.TrimSpace(string(output)))
 				}
 			}
 			// Write the complete scriptContent to the file after the loops
@@ -224,7 +225,7 @@ func DistributeAndRunScripts(cfg *Config) {
 				fmt.Printf("  -> ❌ Execution failed: %v\n", err)
 			} else {
 				fmt.Println("  -> ✅ Execution successful.")
-				time.Sleep(1000 * time.Millisecond)
+				time.Sleep(2000 * time.Millisecond)
 			}
 		}
 	}

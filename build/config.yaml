@@ -1,13 +1,12 @@
 start_port: 20000
-duration_seconds: 1
-stream_type: "fullmesh"
+duration_seconds: 10
+stream_type: "fullmesh" # "fullmesh" or "incast"
 qp_num : 10
 message_size_bytes: 4096
 
 server:
   hostname:
   - "css-g88-001"
-  - "css-g88-002"
   hca:
   - "mlx5_0"
   - "mlx5_1"
@@ -15,7 +14,6 @@ server:
 client:
   hostname:
   - "css-g88-003"
-  - "css-g88-004"
   hca:
   - "mlx5_0"
   - "mlx5_1"
