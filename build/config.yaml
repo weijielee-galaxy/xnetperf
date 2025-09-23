@@ -6,14 +6,44 @@ message_size_bytes: 4096
 
 server:
   hostname:
-  - "css-g88-001"
+  - "cetus-g88-094"
+  - "cetus-g88-061"
+  - "cetus-g88-057"
+  - "cetus-g88-058"
+  - "cetus-g88-070"
+  - "cetus-g88-053"
+  - "cetus-g88-051"
+  - "cetus-g88-064"
+  - "cetus-g88-064"
+  - "cetus-g88-065"
   hca:
   - "mlx5_0"
   - "mlx5_1"
+  - "mlx5_2"
+  - "mlx5_3"
+  - "mlx5_4"
+  - "mlx5_5"
+  - "mlx5_6"
+  - "mlx5_7"
 
 client:
   hostname:
-  - "css-g88-003"
+  - "cetus-g88-062"
+  - "cetus-g88-086"
+  - "cetus-g88-052"
+  - "cetus-g88-087"
+  - "cetus-g88-079"
+  - "cetus-g88-106"
+  - "cetus-g88-112"
+  - "cetus-g88-123"
+  - "cetus-g88-115"
+  - "cetus-g88-168"
   hca:
   - "mlx5_0"
   - "mlx5_1"
+  - "mlx5_2"
+  - "mlx5_3"
+  - "mlx5_4"
+  - "mlx5_5"
+  - "mlx5_6"
+  - "mlx5_7"
