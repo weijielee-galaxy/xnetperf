@@ -245,6 +245,7 @@ func DistributeAndRunScripts(cfg *Config) {
 			}(hostname, scriptContent)
 		}
 	}
+	sshSG.Wait()
 
 	if processedFiles == 0 {
 		fmt.Println("\nNo '.sh' scripts found in the 'streamScript' directory.")
