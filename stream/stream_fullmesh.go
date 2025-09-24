@@ -64,7 +64,7 @@ func GenerateFullMeshScript(cfg *Config) {
 					num++
 					// Append the command to scriptContent instead of overwriting
 					serverScriptContent += fmt.Sprintf("ssh %s 'ib_write_bw -d %s --run_infinitely -m %d -p %d %s &'; %s\n", Server, hcaServer, cfg.MessageSizeBytes, port-1, Ignore, Sleep)
-					clientScriptContent += fmt.Sprintf("ssh %s 'ib_write_bw -d %s --run_infinitely -m %d -p %d  %s %s &'; %s\n", allHost, hcaClient, cfg.MessageSizeBytes, port-1, strings.TrimSpace(string(output)), Ignore, Sleep)
+					clientScriptContent += fmt.Sprintf("ssh %s 'ib_write_bw -d %s --run_infinitely -m %d -p %d  %s %s &'; %s\n", allHost, hcaClient, cfg.MessageSizeBytes, port-1, strings.TrimSpace(string(output)), Ignore, ClientSleep)
 				}
 			}
 			// Write the complete scriptContent to the file after the loops

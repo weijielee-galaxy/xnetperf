@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	Ignore = ">/dev/null 2>&1"
-	Sleep  = "sleep 0.02"
+	Ignore      = ">/dev/null 2>&1"
+	Sleep       = "sleep 0.02"
+	ClientSleep = "sleep 0.06"
 )
 
 // 假设所有的服务器都有同样的HCA数目
@@ -45,7 +46,7 @@ func GenerateIncastScripts(cfg *Config) {
 				for _, cHca := range cfg.Client.Hca {
 					// Append the command to scriptContent instead of overwriting
 					serverScriptContent += fmt.Sprintf("ssh %s 'ib_write_bw -d %s --run_infinitely -m %d -p %d %s &'; %s\n", sHost, sHca, cfg.MessageSizeBytes, port, Ignore, Sleep)
-					clientScriptContent += fmt.Sprintf("ssh %s 'ib_write_bw -d %s --run_infinitely -m %d -p %d %s %s &'; %s\n", cHost, cHca, cfg.MessageSizeBytes, port, strings.TrimSpace(string(hostIP)), Ignore, Sleep)
+					clientScriptContent += fmt.Sprintf("ssh %s 'ib_write_bw -d %s --run_infinitely -m %d -p %d %s %s &'; %s\n", cHost, cHca, cfg.MessageSizeBytes, port, strings.TrimSpace(string(hostIP)), Ignore, ClientSleep)
 					port++
 				}
 			}
