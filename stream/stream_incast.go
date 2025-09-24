@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const Ignore = ">/dev/null 2>&1"
+
 // 假设所有的服务器都有同样的HCA数目
 func GenerateIncastScripts(cfg *Config) {
 	// 清空streamScript文件夹内容
@@ -39,8 +41,8 @@ func GenerateIncastScripts(cfg *Config) {
 			for _, cHost := range cfg.Client.Hostname {
 				for _, cHca := range cfg.Client.Hca {
 					// Append the command to scriptContent instead of overwriting
-					serverScriptContent += fmt.Sprintf("ssh %s ib_write_bw -d %s --run_infinitely -m %d -p %d &\n", sHost, sHca, cfg.MessageSizeBytes, port)
-					clientScriptContent += fmt.Sprintf("ssh %s ib_write_bw -d %s --run_infinitely -m %d -p %d %s &\n", cHost, cHca, cfg.MessageSizeBytes, port, strings.TrimSpace(string(hostIP)))
+					serverScriptContent += fmt.Sprintf("ssh %s ib_write_bw -d %s --run_infinitely -m %d -p %d %s &\n", sHost, sHca, cfg.MessageSizeBytes, port, Ignore)
+					clientScriptContent += fmt.Sprintf("ssh %s ib_write_bw -d %s --run_infinitely -m %d -p %d %s %s &\n", cHost, cHca, cfg.MessageSizeBytes, port, strings.TrimSpace(string(hostIP)), Ignore)
 					port++
 				}
 			}
