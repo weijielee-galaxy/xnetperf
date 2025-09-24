@@ -149,6 +149,7 @@ func DistributeAndRunScripts(cfg *Config) {
 	}
 
 	processedFiles := 0
+	sg := &sync.WaitGroup{}
 	// 先下发服务端脚本，再下发客户端脚本
 	for _, entry := range entries {
 		// Skip subdirectories and non-shell files.
@@ -179,19 +180,26 @@ func DistributeAndRunScripts(cfg *Config) {
 				continue
 			}
 
-			// --- Execute Remotely ---
-			err = executeRemoteScript(hostname, scriptContent)
-			if err != nil {
-				fmt.Printf("  -> ❌ Execution failed: %v\n", err)
-			} else {
-				fmt.Println("  -> ✅ Execution successful.")
-			}
+			sg.Add(1)
+			go func(hostname string, scriptContent []byte) {
+				defer sg.Done()
+				// --- Execute Remotely ---
+				err = executeRemoteScript(hostname, scriptContent)
+				if err != nil {
+					fmt.Printf("  -> ❌ Execution failed: %v\n", err)
+				} else {
+					fmt.Println("  -> ✅ Execution successful.")
+					time.Sleep(2000 * time.Millisecond)
+				}
+			}(hostname, scriptContent)
 		}
 	}
+	sg.Wait()
 
-	fmt.Println("\nWaiting 5 seconds before starting client scripts...")
-	time.Sleep(time.Second * 5)
+	fmt.Printf("\nWaiting %d seconds before starting client scripts...\n", cfg.WaitingTimeSeconds)
+	time.Sleep(time.Second * time.Duration(cfg.WaitingTimeSeconds))
 
+	sshSG := &sync.WaitGroup{}
 	//启动客户端脚本
 	// 先下发服务端脚本，再下发客户端脚本
 	for _, entry := range entries {
@@ -223,14 +231,18 @@ func DistributeAndRunScripts(cfg *Config) {
 				continue
 			}
 
-			// --- Execute Remotely ---
-			err = executeRemoteScript(hostname, scriptContent)
-			if err != nil {
-				fmt.Printf("  -> ❌ Execution failed: %v\n", err)
-			} else {
-				fmt.Println("  -> ✅ Execution successful.")
-				time.Sleep(2000 * time.Millisecond)
-			}
+			sshSG.Add(1)
+			go func(hostname string, scriptContent []byte) {
+				defer sshSG.Done()
+				// --- Execute Remotely ---
+				err = executeRemoteScript(hostname, scriptContent)
+				if err != nil {
+					fmt.Printf("  -> ❌ Execution failed: %v\n", err)
+				} else {
+					fmt.Println("  -> ✅ Execution successful.")
+					time.Sleep(2000 * time.Millisecond)
+				}
+			}(hostname, scriptContent)
 		}
 	}
 

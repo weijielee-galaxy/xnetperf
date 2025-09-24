@@ -4,6 +4,7 @@ stream_type: "incast" # "fullmesh" or "incast"
 qp_num : 10
 message_size_bytes: 4096
 output_base: "./generated_scripts"
+waiting_time_seconds: 15 # Time to wait before starting client scripts
 
 server:
   hostname:

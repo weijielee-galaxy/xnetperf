@@ -12,14 +12,15 @@ const (
 
 // Config holds the entire configuration from the YAML file.
 type Config struct {
-	StartPort        int          `yaml:"start_port"`
-	DurationSeconds  int          `yaml:"duration_seconds"`
-	StreamType       string       `yaml:"stream_type"`
-	QpNum            int          `yaml:"qp_num"`
-	MessageSizeBytes int          `yaml:"message_size_bytes"`
-	OutputBase       string       `yaml:"output_base"`
-	Server           ServerConfig `yaml:"server"`
-	Client           ClientConfig `yaml:"client"`
+	StartPort          int          `yaml:"start_port"`
+	DurationSeconds    int          `yaml:"duration_seconds"`
+	StreamType         string       `yaml:"stream_type"`
+	QpNum              int          `yaml:"qp_num"`
+	MessageSizeBytes   int          `yaml:"message_size_bytes"`
+	OutputBase         string       `yaml:"output_base"`
+	WaitingTimeSeconds int          `yaml:"waiting_time_seconds"`
+	Server             ServerConfig `yaml:"server"`
+	Client             ClientConfig `yaml:"client"`
 }
 
 func (c *Config) IsFullMesh() bool {
