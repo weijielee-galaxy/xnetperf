@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 // 假设所有的服务器都有同样的HCA数目
@@ -39,7 +40,7 @@ func GenerateIncastScripts(cfg *Config) {
 				for _, cHca := range cfg.Client.Hca {
 					// Append the command to scriptContent instead of overwriting
 					serverScriptContent += fmt.Sprintf("ssh %s ib_write_bw -d %s --run_infinitely -m %d -p %d &\n", sHost, sHca, cfg.MessageSizeBytes, port)
-					clientScriptContent += fmt.Sprintf("ssh %s ib_write_bw -d %s --run_infinitely -m %d -p %d %s &\n", cHost, cHca, cfg.MessageSizeBytes, port, string(hostIP))
+					clientScriptContent += fmt.Sprintf("ssh %s ib_write_bw -d %s --run_infinitely -m %d -p %d %s &\n", cHost, cHca, cfg.MessageSizeBytes, port, strings.TrimSpace(string(hostIP)))
 					port++
 				}
 			}
