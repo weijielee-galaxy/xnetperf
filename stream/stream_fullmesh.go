@@ -14,7 +14,7 @@ import (
 // 假设所有的服务器都有同样的HCA数目
 func GenerateFullMeshScript(cfg *Config) {
 	// 清空streamScript文件夹内容
-	ClearStreamScriptDir()
+	ClearStreamScriptDir(cfg)
 	// 生成fullmesh脚本
 	totalPort := len(cfg.Client.Hostname) * len(cfg.Client.Hca) * len(cfg.Server.Hostname) * len(cfg.Server.Hca) * 2
 	fmt.Println("Total Ports Needed:", totalPort)
@@ -30,6 +30,7 @@ func GenerateFullMeshScript(cfg *Config) {
 
 	for _, Server := range allServerHostName {
 		port := cfg.StartPort
+		// ip addr show bond0 | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1
 		command := fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1", "bond0")
 
 		// 2. Create the command to be executed locally: ssh <hostname> "<command>"
@@ -45,10 +46,10 @@ func GenerateFullMeshScript(cfg *Config) {
 		for _, hcaServer := range cfg.Client.Hca {
 			var serverScriptContent, clientScriptContent string
 
-			serverScriptFileName := fmt.Sprintf("streamScript/%s_%s_server_fullmesh.sh", Server, hcaServer)
+			serverScriptFileName := fmt.Sprintf("%s/%s_%s_server_fullmesh.sh", cfg.OutputDir(), Server, hcaServer)
 			// serverScriptContent := "#!/bin/bash\n"
 
-			clientScriptFileName := fmt.Sprintf("streamScript/%s_%s_client_fullmesh.sh", Server, hcaServer)
+			clientScriptFileName := fmt.Sprintf("%s/%s_%s_client_fullmesh.sh", cfg.OutputDir(), Server, hcaServer)
 			// clientScriptContent := "#!/bin/bash\n"
 
 			fmt.Println("Generating scripts for Server:", Server, "Client HCA:", hcaServer)
@@ -139,7 +140,7 @@ func DistributeAndRunScripts(cfg *Config) {
 
 	// 这里是分发和启动脚本的逻辑
 	fmt.Println("Distributing and running scripts...")
-	scriptDir := "streamScript"
+	scriptDir := cfg.OutputDir()
 
 	// Read all entries in the script directory.
 	entries, err := os.ReadDir(scriptDir)

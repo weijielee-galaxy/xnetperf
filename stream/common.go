@@ -5,6 +5,11 @@ import (
 	"os"
 )
 
+const (
+	FullMesh string = "fullmesh"
+	InCast   string = "incast"
+)
+
 // Config holds the entire configuration from the YAML file.
 type Config struct {
 	StartPort        int          `yaml:"start_port"`
@@ -12,8 +17,21 @@ type Config struct {
 	StreamType       string       `yaml:"stream_type"`
 	QpNum            int          `yaml:"qp_num"`
 	MessageSizeBytes int          `yaml:"message_size_bytes"`
+	OutputBase       string       `yaml:"output_base"`
 	Server           ServerConfig `yaml:"server"`
 	Client           ClientConfig `yaml:"client"`
+}
+
+func (c *Config) IsFullMesh() bool {
+	return c.StreamType == FullMesh
+}
+
+func (c *Config) IsInCast() bool {
+	return c.StreamType == InCast
+}
+
+func (c *Config) OutputDir() string {
+	return fmt.Sprintf("%s_%s", c.OutputBase, c.StreamType)
 }
 
 // ServerConfig holds the server-specific settings.
@@ -28,8 +46,8 @@ type ClientConfig struct {
 	Hca      []string `yaml:"hca"`
 }
 
-func ClearStreamScriptDir() {
-	dir := "streamScript"
+func ClearStreamScriptDir(cfg *Config) {
+	dir := cfg.OutputDir()
 	err := os.RemoveAll(dir)
 	if err != nil {
 		fmt.Printf("Error clearing stream script directory: %v\n", err)

@@ -80,8 +80,14 @@ func main() {
 		return
 	}
 
-	if cfg.StreamType == "fullmesh" {
+	switch cfg.StreamType {
+	case stream.FullMesh:
 		stream.GenerateFullMeshScript(cfg)
+	case stream.InCast:
+		stream.GenerateIncastScripts(cfg)
+	default:
+		fmt.Printf("Invalid stream_type '%s' in config.yaml. Must be 'fullmesh' or 'incast'.\n", cfg.StreamType)
+		return
 	}
 
 	// 提取streamScript文件夹下面的脚本，分发到对应的机器上启动，先启动server,然后启动client
