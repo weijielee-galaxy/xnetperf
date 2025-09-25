@@ -20,5 +20,6 @@ func Execute() {
 	rootCmd.AddCommand(collectCmd)
 	rootCmd.AddCommand(analyzeCmd)
 	rootCmd.AddCommand(probeCmd)
+	rootCmd.AddCommand(executeCmd)
 	_ = rootCmd.Execute()
 }
