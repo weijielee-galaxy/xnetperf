@@ -40,32 +40,56 @@ func GenerateIncastScripts(cfg *config.Config) {
 		}
 
 		for _, sHca := range cfg.Server.Hca { // 对于每一个server的HCA，其要启动多少个监听脚本取决于client的HCA和client的hostname数量
+
 			serverScriptFileName := fmt.Sprintf("%s/%s_%s_server_incast.sh", cfg.OutputDir(), sHost, sHca)
 			clientScriptFileName := fmt.Sprintf("%s/%s_%s_client_incast.sh", cfg.OutputDir(), sHost, sHca)
-			var serverScriptContent, clientScriptContent string
+
+			serverScriptContent := strings.Builder{}
+			clientScriptContent := strings.Builder{}
+
 			for _, cHost := range cfg.Client.Hostname {
 				for _, cHca := range cfg.Client.Hca {
-					// Append the command to scriptContent instead of overwriting
-					serverScriptContent += fmt.Sprintf("ssh %s 'ib_write_bw -d %s --run_infinitely -q %d -m %d -p %d %s &'; %s\n", sHost, sHca, cfg.QpNum, cfg.MessageSizeBytes, port, Ignore, Sleep)
-					clientScriptContent += fmt.Sprintf("ssh %s 'ib_write_bw -d %s --run_infinitely -q %d -m %d -p %d %s %s &'; %s\n", cHost, cHca, cfg.QpNum, cfg.MessageSizeBytes, port, strings.TrimSpace(string(hostIP)), Ignore, ClientSleep)
+					// 使用命令构建器创建服务器命令
+					serverCmd := NewIBWriteBWCommandBuilder().
+						Host(sHost).
+						Device(sHca).
+						MessageSize(cfg.MessageSizeBytes).
+						Port(port).
+						RunInfinitely(cfg.Run.Infinitely).
+						DurationSeconds(cfg.Run.DurationSeconds).
+						Report(cfg.Report.Enable).
+						OutputFileName(fmt.Sprintf("%s/report_s_%s_%s_%d.json", cfg.Report.Dir, sHost, sHca, port)).
+						ServerCommand() // 服务器命令不需要目标IP
+
+					// 使用命令构建器创建客户端命令
+					clientCmd := NewIBWriteBWCommandBuilder().
+						Host(cHost).
+						Device(cHca).
+						// QueuePairNum(cfg.QpNum).
+						MessageSize(cfg.MessageSizeBytes).
+						Port(port).
+						TargetIP(strings.TrimSpace(string(hostIP))).
+						RunInfinitely(cfg.Run.Infinitely).
+						DurationSeconds(cfg.Run.DurationSeconds).
+						Report(cfg.Report.Enable).
+						OutputFileName(fmt.Sprintf("%s/report_c_%s_%s_%d.json", cfg.Report.Dir, cHost, cHca, port)).
+						ClientCommand() // 客户端命令有更长的睡眠时间
+
+					serverScriptContent.WriteString(serverCmd.String() + "\n")
+					clientScriptContent.WriteString(clientCmd.String() + "\n")
 					port++
 				}
 			}
-			err := os.WriteFile(serverScriptFileName, []byte(serverScriptContent), 0755)
+			err := os.WriteFile(serverScriptFileName, []byte(serverScriptContent.String()), 0755)
 			if err != nil {
 				fmt.Printf("Error writing script file '%s': %v\n", serverScriptFileName, err)
 				return
 			}
-			err = os.WriteFile(clientScriptFileName, []byte(clientScriptContent), 0755)
+			err = os.WriteFile(clientScriptFileName, []byte(clientScriptContent.String()), 0755)
 			if err != nil {
 				fmt.Printf("Error writing script file '%s': %v\n", serverScriptFileName, err)
 				return
 			}
 		}
 	}
-}
-
-type Command struct {
-	Host    string
-	Command string
 }

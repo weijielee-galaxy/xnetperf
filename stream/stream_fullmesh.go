@@ -45,7 +45,9 @@ func GenerateFullMeshScript(cfg *config.Config) {
 		}
 		fmt.Println("Output from", Server, ":", string(output))
 		for _, hcaServer := range cfg.Client.Hca {
-			var serverScriptContent, clientScriptContent string
+
+			serverScriptContent := strings.Builder{}
+			clientScriptContent := strings.Builder{}
 
 			serverScriptFileName := fmt.Sprintf("%s/%s_%s_server_fullmesh.sh", cfg.OutputDir(), Server, hcaServer)
 			// serverScriptContent := "#!/bin/bash\n"
@@ -61,22 +63,47 @@ func GenerateFullMeshScript(cfg *config.Config) {
 				for _, hcaClient := range cfg.Server.Hca {
 					fmt.Println("num:", num, "Server HCA:", Server, "Server HCA:", hcaClient, port)
 					fmt.Println("num:", num, "client HCA:", allHost, "Client HCA:", hcaClient, port, Server)
+
+					// 使用命令构建器创建服务器命令
+					serverCmd := NewIBWriteBWCommandBuilder().
+						Host(Server).
+						Device(hcaServer).
+						MessageSize(cfg.MessageSizeBytes).
+						Port(port).
+						RunInfinitely(cfg.Run.Infinitely).
+						DurationSeconds(cfg.Run.DurationSeconds).
+						Report(cfg.Report.Enable).
+						OutputFileName(fmt.Sprintf("%s/report_s_%s_%s_%d.json", cfg.Report.Dir, Server, hcaServer, port)).
+						ServerCommand() // 服务器命令不需要目标IP
+
+					// 使用命令构建器创建客户端命令
+					clientCmd := NewIBWriteBWCommandBuilder().
+						Host(allHost).
+						Device(hcaClient).
+						MessageSize(cfg.MessageSizeBytes).
+						Port(port).
+						TargetIP(strings.TrimSpace(string(output))).
+						RunInfinitely(cfg.Run.Infinitely).
+						DurationSeconds(cfg.Run.DurationSeconds).
+						Report(cfg.Report.Enable).
+						OutputFileName(fmt.Sprintf("%s/report_c_%s_%s_%d.json", cfg.Report.Dir, allHost, hcaClient, port)).
+						ClientCommand() // 客户端命令有更长的睡眠时间
+
+					serverScriptContent.WriteString(serverCmd.String() + "\n")
+					clientScriptContent.WriteString(clientCmd.String() + "\n")
 					port++
 					num++
-					// Append the command to scriptContent instead of overwriting
-					serverScriptContent += fmt.Sprintf("ssh %s 'ib_write_bw -d %s --run_infinitely -m %d -p %d %s &'; %s\n", Server, hcaServer, cfg.MessageSizeBytes, port-1, Ignore, Sleep)
-					clientScriptContent += fmt.Sprintf("ssh %s 'ib_write_bw -d %s --run_infinitely -m %d -p %d  %s %s &'; %s\n", allHost, hcaClient, cfg.MessageSizeBytes, port-1, strings.TrimSpace(string(output)), Ignore, ClientSleep)
 				}
 			}
 			// Write the complete scriptContent to the file after the loops
-			err := os.WriteFile(serverScriptFileName, []byte(serverScriptContent), 0755)
+			err := os.WriteFile(serverScriptFileName, []byte(serverScriptContent.String()), 0755)
 			if err != nil {
 				fmt.Printf("Error writing script file '%s': %v\n", serverScriptFileName, err)
 				return
 			}
 
 			// Write the complete scriptContent to the file after the loops
-			err = os.WriteFile(clientScriptFileName, []byte(clientScriptContent), 0755)
+			err = os.WriteFile(clientScriptFileName, []byte(clientScriptContent.String()), 0755)
 			if err != nil {
 				fmt.Printf("Error writing script file '%s': %v\n", serverScriptFileName, err)
 				return

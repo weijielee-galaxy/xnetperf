@@ -5,6 +5,10 @@ message_size_bytes: 4096
 output_base: "./generated_scripts"
 waiting_time_seconds: 15 # Time to wait before starting client scripts
 
+report:
+  enable: false
+  dir: "./reports"
+
 run:
   infinitely: false
   duration_seconds: 10

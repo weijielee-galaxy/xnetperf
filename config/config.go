@@ -21,9 +21,15 @@ type Config struct {
 	MessageSizeBytes   int          `yaml:"message_size_bytes"`
 	OutputBase         string       `yaml:"output_base"`
 	WaitingTimeSeconds int          `yaml:"waiting_time_seconds"`
+	Report             Report       `yaml:"report"`
 	Run                Run          `yaml:"run"`
 	Server             ServerConfig `yaml:"server"`
 	Client             ClientConfig `yaml:"client"`
+}
+
+type Report struct {
+	Enable bool   `yaml:"enable"`
+	Dir    string `yaml:"dir"`
 }
 
 type Run struct {
