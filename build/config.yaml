@@ -1,19 +1,30 @@
 start_port: 20000
 duration_seconds: 10
-stream_type: "fullmesh" # "fullmesh" or "incast"
+stream_type: "incast" # "fullmesh" or "incast"
 qp_num : 10
 message_size_bytes: 4096
+output_base: "./generated_scripts"
+waiting_time_seconds: 15 # Time to wait before starting client scripts
 
 server:
   hostname:
-  - "css-g88-001"
+  - "cetus-g88-094"
   hca:
   - "mlx5_0"
   - "mlx5_1"
-
 client:
   hostname:
-  - "css-g88-003"
+  - "cetus-g88-061"
+  - "cetus-g88-062"
+  - "cetus-g88-063"
+  - "cetus-g88-064"
+  - "cetus-g88-065"
   hca:
   - "mlx5_0"
   - "mlx5_1"
+  - "mlx5_2"
+  - "mlx5_3"
+  - "mlx5_4"
+  - "mlx5_5"
+  - "mlx5_6"
+  - "mlx5_7"
