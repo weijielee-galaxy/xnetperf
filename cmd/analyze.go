@@ -161,14 +161,25 @@ func collectReportData(reportsDir string) (map[string]map[string]*DeviceData, ma
 func displayResults(clientData, serverData map[string]map[string]*DeviceData) {
 	fmt.Println("=== Network Performance Analysis ===\n")
 
-	// Display client data
-	fmt.Println("CLIENT DATA (TX)")
-	fmt.Println("┌─────────────────────┬──────────┬─────────────┐")
-	fmt.Println("│ Hostname            │ Device   │ TX (Gbps)   │")
-	fmt.Println("├─────────────────────┼──────────┼─────────────┤")
+	// 计算总服务端带宽和客户端数量
+	totalServerBW := calculateTotalServerBandwidth(serverData)
+	clientCount := calculateClientCount(clientData)
+	theoreticalBWPerClient := float64(0)
+	if clientCount > 0 {
+		theoreticalBWPerClient = totalServerBW / float64(clientCount)
+	}
 
-	displayDataTable(clientData, false)
-	fmt.Println("└─────────────────────┴──────────┴─────────────┘")
+	// Display client data with enhanced table
+	fmt.Println("CLIENT DATA (TX)")
+	fmt.Println("┌─────────────────────┬──────────┬─────────────┬──────────────┬─────────────────┬──────────┐")
+	fmt.Println("│ Hostname            │ Device   │ TX (Gbps)   │ SPEC (Gbps) │ DELTA           │ Status   │")
+	fmt.Println("├─────────────────────┼──────────┼─────────────┼──────────────┼─────────────────┼──────────┤")
+
+	displayEnhancedClientTable(clientData, theoreticalBWPerClient)
+	fmt.Println("└─────────────────────┴──────────┴─────────────┴──────────────┴─────────────────┴──────────┘")
+
+	fmt.Printf("\nTheoretical BW per client: %.2f Gbps (Total server BW: %.2f Gbps ÷ %d clients)\n",
+		theoreticalBWPerClient, totalServerBW, clientCount)
 
 	fmt.Println()
 
@@ -224,12 +235,22 @@ func displayDataTable(dataMap map[string]map[string]*DeviceData, isServer bool) 
 func generateMarkdownTable(clientData, serverData map[string]map[string]*DeviceData) error {
 	content := "# Network Performance Analysis\n\n"
 
-	// Client data table
-	content += "## Client Data (TX)\n\n"
-	content += "| Hostname | Device | TX (Gbps) |\n"
-	content += "|----------|--------|----------|\n"
+	// 计算理论带宽
+	totalServerBW := calculateTotalServerBandwidth(serverData)
+	clientCount := calculateClientCount(clientData)
+	theoreticalBWPerClient := float64(0)
+	if clientCount > 0 {
+		theoreticalBWPerClient = totalServerBW / float64(clientCount)
+	}
 
-	content += generateMarkdownTableContent(clientData)
+	// Client data table with enhanced columns
+	content += "## Client Data (TX)\n\n"
+	content += fmt.Sprintf("Theoretical BW per client: %.2f Gbps (Total server BW: %.2f Gbps ÷ %d clients)\n\n",
+		theoreticalBWPerClient, totalServerBW, clientCount)
+	content += "| Hostname | Device | TX (Gbps) | SPEC (Gbps) | DELTA | Status |\n"
+	content += "|----------|--------|-----------|-------------|-------|--------|\n"
+
+	content += generateEnhancedMarkdownClientContent(clientData, theoreticalBWPerClient)
 	content += "\n"
 
 	// Server data table
@@ -274,6 +295,141 @@ func generateMarkdownTableContent(dataMap map[string]map[string]*DeviceData) str
 
 			content.WriteString(fmt.Sprintf("| %s | %s | %.2f |\n",
 				hostnameStr, device, total))
+		}
+	}
+
+	return content.String()
+}
+
+// calculateTotalServerBandwidth 计算总服务端带宽
+func calculateTotalServerBandwidth(serverData map[string]map[string]*DeviceData) float64 {
+	total := float64(0)
+	for _, devices := range serverData {
+		for _, data := range devices {
+			total += data.BWSum
+		}
+	}
+	return total
+}
+
+// calculateClientCount 计算客户端数量（host+device组合数）
+func calculateClientCount(clientData map[string]map[string]*DeviceData) int {
+	count := 0
+	for _, devices := range clientData {
+		count += len(devices)
+	}
+	return count
+}
+
+// displayEnhancedClientTable 显示增强的客户端表格
+func displayEnhancedClientTable(clientData map[string]map[string]*DeviceData, theoreticalBW float64) {
+	// Get sorted hostnames
+	var hostnames []string
+	for hostname := range clientData {
+		hostnames = append(hostnames, hostname)
+	}
+	sort.Strings(hostnames)
+
+	for i, hostname := range hostnames {
+		devices := clientData[hostname]
+
+		// Get sorted devices
+		var deviceNames []string
+		for device := range devices {
+			deviceNames = append(deviceNames, device)
+		}
+		sort.Strings(deviceNames)
+
+		for j, device := range deviceNames {
+			data := devices[device]
+			actualBW := data.BWSum
+			delta := actualBW - theoreticalBW
+			deltaPercent := float64(0)
+			if theoreticalBW > 0 {
+				deltaPercent = (delta / theoreticalBW) * 100
+			}
+
+			// 格式化DELTA列
+			deltaStr := fmt.Sprintf("%.1f(%.0f%%)", delta, deltaPercent)
+
+			// 计算状态
+			status := "OK"
+			if abs(deltaPercent) > 20 {
+				status = "NOT OK"
+			}
+
+			// Format hostname (only show for first device of each host)
+			hostnameStr := ""
+			if j == 0 {
+				hostnameStr = hostname
+			}
+
+			fmt.Printf("│ %-19s │ %-8s │ %11.2f │ %12.2f │ %-15s │ %-8s │\n",
+				hostnameStr, device, actualBW, theoreticalBW, deltaStr, status)
+		}
+
+		// Add separator between different hostnames (except for the last one)
+		if i < len(hostnames)-1 && len(clientData[hostname]) > 0 {
+			fmt.Println("├─────────────────────┼──────────┼─────────────┼──────────────┼─────────────────┼──────────┤")
+		}
+	}
+}
+
+// abs 返回浮点数的绝对值
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// generateEnhancedMarkdownClientContent 生成增强的客户端Markdown表格内容
+func generateEnhancedMarkdownClientContent(clientData map[string]map[string]*DeviceData, theoreticalBW float64) string {
+	var content strings.Builder
+
+	// Get sorted hostnames
+	var hostnames []string
+	for hostname := range clientData {
+		hostnames = append(hostnames, hostname)
+	}
+	sort.Strings(hostnames)
+
+	for _, hostname := range hostnames {
+		devices := clientData[hostname]
+
+		// Get sorted devices
+		var deviceNames []string
+		for device := range devices {
+			deviceNames = append(deviceNames, device)
+		}
+		sort.Strings(deviceNames)
+
+		for j, device := range deviceNames {
+			data := devices[device]
+			actualBW := data.BWSum
+			delta := actualBW - theoreticalBW
+			deltaPercent := float64(0)
+			if theoreticalBW > 0 {
+				deltaPercent = (delta / theoreticalBW) * 100
+			}
+
+			// 格式化DELTA列
+			deltaStr := fmt.Sprintf("%.1f(%.0f%%)", delta, deltaPercent)
+
+			// 计算状态
+			status := "OK"
+			if abs(deltaPercent) > 20 {
+				status = "NOT OK"
+			}
+
+			// Format hostname (only show for first device of each host)
+			hostnameStr := ""
+			if j == 0 {
+				hostnameStr = hostname
+			}
+
+			content.WriteString(fmt.Sprintf("| %s | %s | %.2f | %.2f | %s | %s |\n",
+				hostnameStr, device, actualBW, theoreticalBW, deltaStr, status))
 		}
 	}
 
