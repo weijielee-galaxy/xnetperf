@@ -206,26 +206,23 @@ func executeAnalyzeStep(cfg *config.Config) bool {
 
 	fmt.Println("Analyzing performance results...")
 
-	// Call the analyze function with simulated command and args
-	// We'll create a temporary cobra command to pass to runAnalyze
-	tempCmd := &cobra.Command{}
-	tempCmd.Flag("markdown").Changed = false
-	tempCmd.Flag("reports-dir").Changed = false
+	reportsDir := "reports"
 
-	// Save current global values
-	originalGenerateMD := generateMD
-	originalReportsPath := reportsPath
+	// Check if reports directory exists
+	if _, err := os.Stat(reportsDir); os.IsNotExist(err) {
+		fmt.Printf("❌ Reports directory not found: %s\n", reportsDir)
+		return false
+	}
 
-	// Set values for execute
-	generateMD = false
-	reportsPath = "reports"
+	// Collect report data using analyze.go function
+	clientData, serverData, err := collectReportData(reportsDir)
+	if err != nil {
+		fmt.Printf("❌ Error collecting report data: %v\n", err)
+		return false
+	}
 
-	// Call the analyze function
-	runAnalyze(tempCmd, []string{})
-
-	// Restore original values
-	generateMD = originalGenerateMD
-	reportsPath = originalReportsPath
+	// Display results using analyze.go function
+	displayResults(clientData, serverData)
 
 	fmt.Println("✅ Analysis completed successfully")
 	return true
