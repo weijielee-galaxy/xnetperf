@@ -46,7 +46,6 @@ Can optionally generate a Markdown table file.`,
 }
 
 func init() {
-	rootCmd.AddCommand(analyzeCmd)
 	analyzeCmd.Flags().BoolVar(&generateMD, "markdown", false, "Generate markdown table file")
 	analyzeCmd.Flags().StringVar(&reportsPath, "reports-dir", "reports", "Path to the reports directory")
 }
