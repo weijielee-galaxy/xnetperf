@@ -17,5 +17,6 @@ func Execute() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "./config.yaml", "config file")
 	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(stopCmd)
+	rootCmd.AddCommand(collectCmd)
 	_ = rootCmd.Execute()
 }
