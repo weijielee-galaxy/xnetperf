@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"xnetperf/config"
 )
 
 const (
@@ -14,7 +15,7 @@ const (
 )
 
 // 假设所有的服务器都有同样的HCA数目
-func GenerateIncastScripts(cfg *Config) {
+func GenerateIncastScripts(cfg *config.Config) {
 	// 清空streamScript文件夹内容
 	ClearStreamScriptDir(cfg)
 	// 生成incast脚本
@@ -62,4 +63,9 @@ func GenerateIncastScripts(cfg *Config) {
 			}
 		}
 	}
+}
+
+type Command struct {
+	Host    string
+	Command string
 }

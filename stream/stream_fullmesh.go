@@ -9,10 +9,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"xnetperf/config"
 )
 
 // 假设所有的服务器都有同样的HCA数目
-func GenerateFullMeshScript(cfg *Config) {
+func GenerateFullMeshScript(cfg *config.Config) {
 	// 清空streamScript文件夹内容
 	ClearStreamScriptDir(cfg)
 	// 生成fullmesh脚本
@@ -131,7 +132,7 @@ func ClearPreviewScript(hosts []string) {
 	fmt.Println("All commands completed.")
 }
 
-func DistributeAndRunScripts(cfg *Config) {
+func DistributeAndRunScripts(cfg *config.Config) {
 	// 下发前先清空之前的结果
 	fmt.Println("Distributing and running scripts...")
 	allServerHostName := append(cfg.Server.Hostname, cfg.Client.Hostname...)
