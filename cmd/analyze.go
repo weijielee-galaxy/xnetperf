@@ -202,7 +202,7 @@ func displayDataTable(dataMap map[string]map[string]*DeviceData, isServer bool) 
 
 		for j, device := range deviceNames {
 			data := devices[device]
-			average := data.BWSum / float64(data.Count)
+			total := data.BWSum // 使用累加值而不是平均值
 
 			// Format hostname (only show for first device of each host)
 			hostnameStr := ""
@@ -211,7 +211,7 @@ func displayDataTable(dataMap map[string]map[string]*DeviceData, isServer bool) 
 			}
 
 			fmt.Printf("│ %-19s │ %-8s │ %11.2f │\n",
-				hostnameStr, device, average)
+				hostnameStr, device, total)
 		}
 
 		// Add separator between different hostnames (except for the last one)
@@ -264,7 +264,7 @@ func generateMarkdownTableContent(dataMap map[string]map[string]*DeviceData) str
 
 		for j, device := range deviceNames {
 			data := devices[device]
-			average := data.BWSum / float64(data.Count)
+			total := data.BWSum // 使用累加值而不是平均值
 
 			// Format hostname (only show for first device of each host)
 			hostnameStr := ""
@@ -273,7 +273,7 @@ func generateMarkdownTableContent(dataMap map[string]map[string]*DeviceData) str
 			}
 
 			content.WriteString(fmt.Sprintf("| %s | %s | %.2f |\n",
-				hostnameStr, device, average))
+				hostnameStr, device, total))
 		}
 	}
 
