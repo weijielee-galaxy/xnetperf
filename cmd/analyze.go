@@ -172,7 +172,7 @@ func displayResults(clientData, serverData map[string]map[string]*DeviceData) {
 	// Display client data with enhanced table
 	fmt.Println("CLIENT DATA (TX)")
 	fmt.Println("┌─────────────────────┬──────────┬─────────────┬──────────────┬─────────────────┬──────────┐")
-	fmt.Println("│ Hostname            │ Device   │ TX (Gbps)   │ SPEC (Gbps) │ DELTA           │ Status   │")
+	fmt.Println("│ Hostname            │ Device   │ TX (Gbps)   │ SPEC (Gbps)  │ DELTA           │ Status   │")
 	fmt.Println("├─────────────────────┼──────────┼─────────────┼──────────────┼─────────────────┼──────────┤")
 
 	displayEnhancedClientTable(clientData, theoreticalBWPerClient)
