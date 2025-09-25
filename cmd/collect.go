@@ -48,6 +48,38 @@ func init() {
 	collectCmd.Flags().BoolVar(&cleanupRemote, "cleanup", false, "Delete remote report files after successful collection")
 }
 
+func cleanupLocalFiles(reportsDir string, hosts map[string]bool) {
+	fmt.Printf("Cleaning up existing local report files...\n")
+
+	for hostname := range hosts {
+		hostDir := filepath.Join(reportsDir, hostname)
+
+		// 检查主机目录是否存在
+		if _, err := os.Stat(hostDir); os.IsNotExist(err) {
+			continue // 目录不存在，跳过
+		}
+
+		// 查找该主机的所有JSON文件
+		pattern := filepath.Join(hostDir, "*.json")
+		files, err := filepath.Glob(pattern)
+		if err != nil {
+			fmt.Printf("   [WARNING] ⚠️  %s: Error finding local files: %v\n", hostname, err)
+			continue
+		}
+
+		if len(files) > 0 {
+			// 删除找到的文件
+			for _, file := range files {
+				if err := os.Remove(file); err != nil {
+					fmt.Printf("   [WARNING] ⚠️  %s: Failed to remove %s: %v\n", hostname, file, err)
+				}
+			}
+			fmt.Printf("   [CLEANUP] 🧹 %s: Removed %d existing local files\n", hostname, len(files))
+		}
+	}
+	fmt.Println()
+}
+
 func collectReports(cfg *config.Config) {
 	// 创建本地reports目录
 	reportsDir := "reports"
@@ -65,6 +97,9 @@ func collectReports(cfg *config.Config) {
 	for _, host := range cfg.Client.Hostname {
 		allHosts[host] = true
 	}
+
+	// 在收集前清理本地已存在的报告文件
+	cleanupLocalFiles(reportsDir, allHosts)
 
 	var wg sync.WaitGroup
 	fmt.Printf("Collecting reports from %d hosts...\n", len(allHosts))
@@ -92,9 +127,9 @@ func collectFromHost(hostname, remoteDir, localBaseDir string) {
 
 	fmt.Printf("-> Collecting reports from %s...\n", hostname)
 
-	// 使用scp递归复制所有JSON报告文件
-	// scp -r hostname:remoteDir/*.json localDir/
-	scpCmd := fmt.Sprintf("%s/*.json", remoteDir)
+	// 使用scp收集属于当前主机的JSON报告文件（按主机名匹配）
+	// scp hostname:remoteDir/*hostname*.json localDir/
+	scpCmd := fmt.Sprintf("%s/*%s*.json", remoteDir, hostname)
 	cmd := exec.Command("scp", fmt.Sprintf("%s:%s", hostname, scpCmd), hostDir+"/")
 
 	output, err := cmd.CombinedOutput()

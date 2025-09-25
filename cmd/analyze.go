@@ -158,7 +158,7 @@ func collectReportData(reportsDir string) (map[string]map[string]*DeviceData, ma
 }
 
 func displayResults(clientData, serverData map[string]map[string]*DeviceData) {
-	fmt.Println("=== Network Performance Analysis ===\n")
+	fmt.Println("=== Network Performance Analysis ===")
 
 	// 计算总服务端带宽和客户端数量
 	totalServerBW := calculateTotalServerBandwidth(serverData)
@@ -363,7 +363,7 @@ func displayEnhancedClientTable(clientData map[string]map[string]*DeviceData, th
 				hostnameStr = hostname
 			}
 
-			fmt.Printf("│ %-19s │ %-8s │ %11.2f │ %12.2f │ %-15s │ %-8s │\n",
+			fmt.Printf("│ %-19s │ %-8s │ %11.2f │ %12.2f │ %15s │ %-8s │\n",
 				hostnameStr, device, actualBW, theoreticalBW, deltaStr, status)
 		}
 
