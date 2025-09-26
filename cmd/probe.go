@@ -67,6 +67,60 @@ func execProbeCommand(cfg *config.Config) {
 		return
 	}
 
+	fmt.Printf("Probing ib_write_bw processes on %d hosts...\n", len(allHosts))
+	fmt.Printf("Probe interval: %d seconds\n", probeInterval)
+	if oneShot {
+		fmt.Println("Mode: One-shot probe")
+	} else {
+		fmt.Println("Mode: Continuous monitoring until all processes complete")
+	}
+	fmt.Println()
+
+	for {
+		results := probeAllHosts(allHosts)
+		displayProbeResults(results)
+
+		// 如果是一次性探测，直接退出
+		if oneShot {
+			break
+		}
+
+		// 检查是否所有进程都已完成
+		allCompleted := true
+		for _, result := range results {
+			if result.ProcessCount > 0 {
+				allCompleted = false
+				break
+			}
+		}
+
+		if allCompleted {
+			fmt.Println("✅ All ib_write_bw processes have completed!")
+			break
+		}
+
+		// 等待下一次探测
+		fmt.Printf("Waiting %d seconds for next probe...\n\n", probeInterval)
+		time.Sleep(time.Duration(probeInterval) * time.Second)
+	}
+}
+
+func execProbeCommandv1(cfg *config.Config) {
+
+	// 获取所有主机列表
+	allHosts := make(map[string]bool)
+	for _, host := range cfg.Server.Hostname {
+		allHosts[host] = true
+	}
+	for _, host := range cfg.Client.Hostname {
+		allHosts[host] = true
+	}
+
+	if len(allHosts) == 0 {
+		fmt.Println("No hosts configured in config file")
+		return
+	}
+
 	// 获取测试持续时间和开始时间
 	testDuration := cfg.Run.DurationSeconds
 	testStartTime := time.Now()
@@ -99,7 +153,7 @@ func execProbeCommand(cfg *config.Config) {
 			clearPreviousOutput()
 		}
 
-		displayProbeResults(results, remainingTime, testDuration)
+		displayProbeResultsv1(results, remainingTime, testDuration)
 		isFirstProbe = false
 
 		// 如果是一次性探测，直接退出
@@ -137,7 +191,7 @@ func execProbeCommand(cfg *config.Config) {
 		for i := nextProbeIn; i > 0; i-- {
 			if i < nextProbeIn {
 				clearPreviousOutput()
-				displayProbeResults(lastResults, testEndTime.Sub(time.Now()), testDuration)
+				displayProbeResultsv1(lastResults, testEndTime.Sub(time.Now()), testDuration)
 				fmt.Printf("Next probe in %d seconds...\n", i)
 			} else {
 				fmt.Printf("Next probe in %d seconds...\n", i)
@@ -148,7 +202,7 @@ func execProbeCommand(cfg *config.Config) {
 				time.Sleep(200 * time.Millisecond)
 				if i < nextProbeIn && j < 4 { // 避免在最后一次时重复清除
 					clearPreviousOutput()
-					displayProbeResults(lastResults, testEndTime.Sub(time.Now()), testDuration)
+					displayProbeResultsv1(lastResults, testEndTime.Sub(time.Now()), testDuration)
 					fmt.Printf("Next probe in %d seconds...\n", i)
 				}
 			}
@@ -263,7 +317,65 @@ func clearPreviousOutput() {
 	fmt.Print("\033[2K") // 清除最后一行
 }
 
-func displayProbeResults(results []ProbeResult, remainingTime time.Duration, testDuration int) {
+func displayProbeResults(results []ProbeResult) {
+	fmt.Printf("=== Probe Results (%s) ===\n", time.Now().Format("15:04:05"))
+	fmt.Println("┌─────────────────────┬─────────────┬──────────────┬─────────────┐")
+	fmt.Println("│ Hostname            │ Status      │ Process Count│ Details     │")
+	fmt.Println("├─────────────────────┼─────────────┼──────────────┼─────────────┤")
+
+	for _, result := range results {
+		details := ""
+		statusIcon := ""
+
+		switch result.Status {
+		case "RUNNING":
+			statusIcon = "🟡 RUNNING"
+			if result.ProcessCount > 0 {
+				details = fmt.Sprintf("%d process(es)", result.ProcessCount)
+			}
+		case "COMPLETED":
+			statusIcon = "✅ COMPLETED"
+			details = "No processes"
+		case "ERROR":
+			statusIcon = "❌ ERROR"
+			details = "Connection failed"
+		}
+
+		fmt.Printf("│ %-19s │ %-11s │ %12d │ %-11s │\n",
+			result.Hostname, statusIcon, result.ProcessCount, details)
+
+		// 如果有错误，在下一行显示错误信息
+		if result.Error != "" {
+			fmt.Printf("│ %-19s │ %-11s │ %12s │ %-11s │\n",
+				"", "Error:", "", result.Error)
+		}
+	}
+
+	fmt.Println("└─────────────────────┴─────────────┴──────────────┴─────────────┘")
+
+	// 显示总结信息
+	running := 0
+	completed := 0
+	errors := 0
+	totalProcesses := 0
+
+	for _, result := range results {
+		switch result.Status {
+		case "RUNNING":
+			running++
+			totalProcesses += result.ProcessCount
+		case "COMPLETED":
+			completed++
+		case "ERROR":
+			errors++
+		}
+	}
+
+	fmt.Printf("\nSummary: %d hosts running (%d processes), %d completed, %d errors\n",
+		running, totalProcesses, completed, errors)
+}
+
+func displayProbeResultsv1(results []ProbeResult, remainingTime time.Duration, testDuration int) {
 	// 显示当前时间和倒计时信息
 	currentTime := time.Now().Format("15:04:05")
 	fmt.Printf("=== Probe Results (%s) ===\n", currentTime)
