@@ -23,6 +23,7 @@ type Config struct {
 	OutputBase         string       `yaml:"output_base"`
 	WaitingTimeSeconds int          `yaml:"waiting_time_seconds"`
 	Speed              float64      `yaml:"speed"` // in Gbps
+	RdmaCm             bool         `yaml:"rdma_cm"`
 	Report             Report       `yaml:"report"`
 	Run                Run          `yaml:"run"`
 	Server             ServerConfig `yaml:"server"`

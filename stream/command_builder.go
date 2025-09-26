@@ -22,6 +22,7 @@ type IBWriteBWCommandBuilder struct {
 	report          bool
 	outputFileName  string
 	bidirectional   bool // 新增双向测试参数
+	rdmaCm          bool // RDMA CM参数
 }
 
 // NewIBWriteBWCommandBuilder creates a new command builder
@@ -125,6 +126,12 @@ func (b *IBWriteBWCommandBuilder) Bidirectional(enable bool) *IBWriteBWCommandBu
 	return b
 }
 
+// RdmaCm sets whether to use RDMA CM (adds -R flag)
+func (b *IBWriteBWCommandBuilder) RdmaCm(enable bool) *IBWriteBWCommandBuilder {
+	b.rdmaCm = enable
+	return b
+}
+
 // String builds and returns the complete command string
 func (b *IBWriteBWCommandBuilder) String() string {
 	// Validate that outputFileName is provided when report is enabled and not running infinitely
@@ -164,6 +171,10 @@ func (b *IBWriteBWCommandBuilder) String() string {
 
 	if b.bidirectional {
 		cmd.WriteString(" -b")
+	}
+
+	if b.rdmaCm {
+		cmd.WriteString(" -R")
 	}
 
 	if b.targetIP != "" {

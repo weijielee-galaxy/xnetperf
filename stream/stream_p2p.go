@@ -117,6 +117,7 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 		RunInfinitely(cfg.Run.Infinitely).
 		DurationSeconds(cfg.Run.DurationSeconds).
 		Bidirectional(true). // P2P mode uses bidirectional testing
+		RdmaCm(cfg.RdmaCm).
 		Report(cfg.Report.Enable).
 		OutputFileName(fmt.Sprintf("%s/report_%s_%s_%d.json", cfg.Report.Dir, serverHost, serverHca, port)).
 		ServerCommand()
@@ -132,6 +133,7 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 		RunInfinitely(cfg.Run.Infinitely).
 		DurationSeconds(cfg.Run.DurationSeconds).
 		Bidirectional(true). // P2P mode uses bidirectional testing
+		RdmaCm(cfg.RdmaCm).
 		Report(cfg.Report.Enable).
 		OutputFileName(fmt.Sprintf("%s/report_%s_%s_%d.json", cfg.Report.Dir, clientHost, clientHca, port)).
 		ClientCommand()

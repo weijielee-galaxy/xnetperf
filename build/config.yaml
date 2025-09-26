@@ -5,6 +5,7 @@ message_size_bytes: 4096
 output_base: "./generated_scripts"
 waiting_time_seconds: 15 # Time to wait before starting client scripts
 speed: 400 # in Gbps, used for theoretical bandwidth calculation
+rdma_cm: true
 
 report:
   enable: true

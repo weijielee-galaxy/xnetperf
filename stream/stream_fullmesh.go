@@ -72,6 +72,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 						Port(port).
 						RunInfinitely(cfg.Run.Infinitely).
 						DurationSeconds(cfg.Run.DurationSeconds).
+						RdmaCm(cfg.RdmaCm).
 						Report(cfg.Report.Enable).
 						OutputFileName(fmt.Sprintf("%s/report_s_%s_%s_%d.json", cfg.Report.Dir, Server, hcaServer, port)).
 						ServerCommand() // 服务器命令不需要目标IP
@@ -85,6 +86,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 						TargetIP(strings.TrimSpace(string(output))).
 						RunInfinitely(cfg.Run.Infinitely).
 						DurationSeconds(cfg.Run.DurationSeconds).
+						RdmaCm(cfg.RdmaCm).
 						Report(cfg.Report.Enable).
 						OutputFileName(fmt.Sprintf("%s/report_c_%s_%s_%d.json", cfg.Report.Dir, allHost, hcaClient, port)).
 						ClientCommand() // 客户端命令有更长的睡眠时间

@@ -558,3 +558,58 @@ func TestIBWriteBWCommandBuilder_String_ReportWithInfiniteNoFilenameRequired(t *
 		t.Error("Should not contain --report_gbits when runInfinitely is true")
 	}
 }
+
+func TestRdmaCm(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder()
+
+	// Test RdmaCm method returns builder for chaining
+	result := builder.RdmaCm(true)
+	if result != builder {
+		t.Error("RdmaCm should return the same builder instance for chaining")
+	}
+
+	// Test RdmaCm enabled
+	builder.Host("test-host").Device("mlx5_0").Port(20000).RdmaCm(true)
+	cmd := builder.String()
+	if !strings.Contains(cmd, " -R") {
+		t.Error("Command should contain -R flag when RdmaCm is true")
+	}
+
+	// Test RdmaCm disabled
+	builder2 := NewIBWriteBWCommandBuilder()
+	builder2.Host("test-host").Device("mlx5_0").Port(20000).RdmaCm(false)
+	cmd2 := builder2.String()
+	if strings.Contains(cmd2, " -R") {
+		t.Error("Command should not contain -R flag when RdmaCm is false")
+	}
+}
+
+func TestRdmaCmWithOtherFlags(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder()
+	builder.Host("test-host").
+		Device("mlx5_0").
+		Port(20000).
+		Bidirectional(true).
+		RdmaCm(true).
+		QueuePairNum(10)
+
+	cmd := builder.String()
+
+	// Should contain both -b and -R flags
+	if !strings.Contains(cmd, " -b") {
+		t.Error("Command should contain -b flag")
+	}
+	if !strings.Contains(cmd, " -R") {
+		t.Error("Command should contain -R flag")
+	}
+
+	// Check flag order (should be -b before -R)
+	bIndex := strings.Index(cmd, " -b")
+	rIndex := strings.Index(cmd, " -R")
+	if bIndex == -1 || rIndex == -1 {
+		t.Error("Both -b and -R flags should be present")
+	}
+	if bIndex >= rIndex {
+		t.Error("Expected -b flag to appear before -R flag in command")
+	}
+}
