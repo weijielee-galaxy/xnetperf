@@ -48,6 +48,11 @@ func runProbe(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	execProbeCommand(cfg)
+}
+
+func execProbeCommand(cfg *config.Config) {
+
 	// 获取所有主机列表
 	allHosts := make(map[string]bool)
 	for _, host := range cfg.Server.Hostname {

@@ -20,23 +20,26 @@ var runCmd = &cobra.Command{
 			fmt.Printf("Error reading config: %v\n", err)
 			os.Exit(1)
 		}
-
-		// 在运行测试前清理远程主机上的旧JSON报告文件
-		if cfg.Report.Enable {
-			cleanupRemoteReportFiles(cfg)
-		}
-
-		switch cfg.StreamType {
-		case config.FullMesh:
-			stream.GenerateFullMeshScript(cfg)
-		case config.InCast:
-			stream.GenerateIncastScripts(cfg)
-		default:
-			fmt.Printf("Invalid stream_type '%s' in config.\n", cfg.StreamType)
-			os.Exit(1)
-		}
-		stream.DistributeAndRunScripts(cfg)
+		execRunCommand(cfg)
 	},
+}
+
+func execRunCommand(cfg *config.Config) {
+	// 在运行测试前清理远程主机上的旧JSON报告文件
+	if cfg.Report.Enable {
+		cleanupRemoteReportFiles(cfg)
+	}
+
+	switch cfg.StreamType {
+	case config.FullMesh:
+		stream.GenerateFullMeshScript(cfg)
+	case config.InCast:
+		stream.GenerateIncastScripts(cfg)
+	default:
+		fmt.Printf("Invalid stream_type '%s' in config.\n", cfg.StreamType)
+		os.Exit(1)
+	}
+	stream.DistributeAndRunScripts(cfg)
 }
 
 func cleanupRemoteReportFiles(cfg *config.Config) {

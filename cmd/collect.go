@@ -40,7 +40,7 @@ Examples:
 			return
 		}
 
-		collectReports(cfg)
+		execCollectCommand(cfg)
 	},
 }
 
@@ -80,13 +80,13 @@ func cleanupLocalFiles(reportsDir string, hosts map[string]bool) {
 	fmt.Println()
 }
 
-func collectReports(cfg *config.Config) {
+func execCollectCommand(cfg *config.Config) error {
 	// 创建本地reports目录
 	reportsDir := "reports"
 	err := os.MkdirAll(reportsDir, 0755)
 	if err != nil {
 		fmt.Printf("Error creating reports directory: %v\n", err)
-		return
+		return err
 	}
 
 	// 获取所有主机列表
@@ -114,6 +114,7 @@ func collectReports(cfg *config.Config) {
 
 	wg.Wait()
 	fmt.Printf("Report collection completed. Files saved to '%s' directory.\n", reportsDir)
+	return nil
 }
 
 func collectFromHost(hostname, remoteDir, localBaseDir string) {

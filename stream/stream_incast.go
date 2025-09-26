@@ -8,12 +8,6 @@ import (
 	"xnetperf/config"
 )
 
-const (
-	Ignore      = ">/dev/null 2>&1"
-	Sleep       = "sleep 0.02"
-	ClientSleep = "sleep 0.06"
-)
-
 // 假设所有的服务器都有同样的HCA数目
 func GenerateIncastScripts(cfg *config.Config) {
 	// 清空streamScript文件夹内容
