@@ -138,9 +138,20 @@ func execProbeCommand(cfg *config.Config) {
 			if i < nextProbeIn {
 				clearPreviousOutput()
 				displayProbeResults(lastResults, testEndTime.Sub(time.Now()), testDuration)
+				fmt.Printf("Next probe in %d seconds...\n", i)
+			} else {
+				fmt.Printf("Next probe in %d seconds...\n", i)
 			}
-			fmt.Printf("Next probe in %d seconds...\n", i)
-			time.Sleep(1 * time.Second)
+
+			// 在1秒内多次更新动态效果 (每200ms更新一次)
+			for j := 0; j < 5; j++ {
+				time.Sleep(200 * time.Millisecond)
+				if i < nextProbeIn && j < 4 { // 避免在最后一次时重复清除
+					clearPreviousOutput()
+					displayProbeResults(lastResults, testEndTime.Sub(time.Now()), testDuration)
+					fmt.Printf("Next probe in %d seconds...\n", i)
+				}
+			}
 
 			// 检查是否提前完成
 			if testDuration > 0 && testEndTime.Sub(time.Now()) <= 0 {
@@ -232,10 +243,24 @@ func probeHost(hostname string) ProbeResult {
 
 // clearPreviousOutput clears the previous output using ANSI escape sequences
 func clearPreviousOutput() {
-	// 移动光标到上方并清除内容
-	// 这里估算需要清除大约25行的内容（表格+摘要信息+倒计时行）
-	fmt.Print("\033[25A") // 向上移动25行
-	fmt.Print("\033[J")   // 清除从光标到屏幕结尾的内容
+	// 精确计算需要清除的行数：
+	// - Probe Results标题行: 1行
+	// - 倒计时行: 1行 (如果有)
+	// - 表格头部: 3行 (顶部边框、标题行、分隔符)
+	// - 表格内容: 最多每个主机1行 (假设最多10行)
+	// - 表格底部: 1行
+	// - Summary行: 1行
+	// - Next probe行: 1行
+	// 总计约18行，为了安全起见使用20行
+
+	// 使用更保守的清除方式，避免过度清除
+	fmt.Print("\033[2K") // 清除当前行
+	fmt.Print("\033[1A") // 向上1行
+	for i := 0; i < 15; i++ {
+		fmt.Print("\033[2K") // 清除整行
+		fmt.Print("\033[1A") // 向上移动1行
+	}
+	fmt.Print("\033[2K") // 清除最后一行
 }
 
 func displayProbeResults(results []ProbeResult, remainingTime time.Duration, testDuration int) {
@@ -245,47 +270,47 @@ func displayProbeResults(results []ProbeResult, remainingTime time.Duration, tes
 
 	if testDuration > 0 {
 		if remainingTime > 0 {
-			fmt.Printf("⏰ Time remaining: %02d:%02d (%.0f seconds)\n",
+			fmt.Printf("Time remaining: %02d:%02d (%.0f seconds)\n",
 				int(remainingTime.Minutes()), int(remainingTime.Seconds())%60, remainingTime.Seconds())
 		} else {
-			fmt.Printf("⏰ Test duration completed!\n")
+			fmt.Printf("Test duration completed!\n")
 		}
 	}
 
-	// 修复表格对齐 - 为了适应emoji，需要调整Status列的宽度
-	// Status列需要更宽来容纳emoji字符
-	fmt.Println("┌─────────────────────┬──────────────────┬──────────────┬─────────────────┬──────────┐")
-	fmt.Println("│ Hostname            │ Status           │ Process Count│ Details         │ Activity │")
-	fmt.Println("├─────────────────────┼──────────────────┼──────────────┼─────────────────┼──────────┤")
+	// 使用纯ASCII字符避免emoji对齐问题
+	fmt.Println("┌─────────────────────┬─────────────┬──────────────┬─────────────────┬──────────┐")
+	fmt.Println("│ Hostname            │ Status      │ Process Count│ Details         │ Activity │")
+	fmt.Println("├─────────────────────┼─────────────┼──────────────┼─────────────────┼──────────┤")
 
-	// 简单的动态效果字符数组
+	// 动态效果字符数组 - 更快的刷新频率
 	activityChars := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	activityIndex := int(time.Now().Unix()) % len(activityChars)
+	// 使用毫秒级别的时间戳来获得更快的动画效果
+	activityIndex := int(time.Now().UnixNano()/100000000) % len(activityChars)
 
 	for _, result := range results {
 		details := ""
-		statusIcon := ""
+		statusText := ""
 		activity := " "
 
 		switch result.Status {
 		case "RUNNING":
-			statusIcon = "🟡 RUNNING"
+			statusText = "RUNNING"
 			activity = activityChars[activityIndex]
 			if result.ProcessCount > 0 {
 				details = fmt.Sprintf("%d process(es)", result.ProcessCount)
 			}
 		case "COMPLETED":
-			statusIcon = "✅ COMPLETED"
+			statusText = "COMPLETED"
 			activity = "✓"
 			details = "No processes"
 		case "ERROR":
-			statusIcon = "❌ ERROR"
+			statusText = "ERROR"
 			activity = "✗"
 			details = "Connection failed"
 		}
 
-		fmt.Printf("│ %-19s │ %-16s │ %12d │ %-15s │ %-8s │\n",
-			result.Hostname, statusIcon, result.ProcessCount, details, activity)
+		fmt.Printf("│ %-19s │ %-11s │ %12d │ %-15s │ %-8s │\n",
+			result.Hostname, statusText, result.ProcessCount, details, activity)
 
 		// 如果有错误，在下一行显示错误信息
 		if result.Error != "" {
@@ -294,12 +319,12 @@ func displayProbeResults(results []ProbeResult, remainingTime time.Duration, tes
 			if len(errorMsg) > 15 {
 				errorMsg = errorMsg[:12] + "..."
 			}
-			fmt.Printf("│ %-19s │ %-16s │ %12s │ %-15s │ %-8s │\n",
+			fmt.Printf("│ %-19s │ %-11s │ %12s │ %-15s │ %-8s │\n",
 				"", "Error:", "", errorMsg, "")
 		}
 	}
 
-	fmt.Println("└─────────────────────┴──────────────────┴──────────────┴─────────────────┴──────────┘")
+	fmt.Println("└─────────────────────┴─────────────┴──────────────┴─────────────────┴──────────┘")
 
 	// 显示总结信息
 	running := 0
