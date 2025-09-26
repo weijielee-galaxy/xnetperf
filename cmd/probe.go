@@ -187,95 +187,9 @@ func probeHost(hostname string) ProbeResult {
 
 func displayProbeResults(results []ProbeResult) {
 	fmt.Printf("=== Probe Results (%s) ===\n", time.Now().Format("15:04:05"))
-
-	// 计算每列的最大宽度
-	maxHostnameWidth := len("Hostname")
-	maxStatusWidth := len("Status")
-	maxProcessCountWidth := len("Process Count")
-	maxDetailsWidth := len("Details")
-
-	for _, result := range results {
-		if len(result.Hostname) > maxHostnameWidth {
-			maxHostnameWidth = len(result.Hostname)
-		}
-
-		statusText := ""
-		switch result.Status {
-		case "RUNNING":
-			statusText = "🟡 RUNNING"
-		case "COMPLETED":
-			statusText = "✅ COMPLETED"
-		case "ERROR":
-			statusText = "❌ ERROR"
-		}
-
-		if len(statusText) > maxStatusWidth {
-			maxStatusWidth = len(statusText)
-		}
-
-		processCountText := fmt.Sprintf("%d", result.ProcessCount)
-		if len(processCountText) > maxProcessCountWidth {
-			maxProcessCountWidth = len(processCountText)
-		}
-
-		details := ""
-		switch result.Status {
-		case "RUNNING":
-			if result.ProcessCount > 0 {
-				details = fmt.Sprintf("%d process(es)", result.ProcessCount)
-			}
-		case "COMPLETED":
-			details = "No processes"
-		case "ERROR":
-			details = "Connection failed"
-		}
-
-		if len(details) > maxDetailsWidth {
-			maxDetailsWidth = len(details)
-		}
-	}
-
-	// 确保最小宽度
-	if maxHostnameWidth < 15 {
-		maxHostnameWidth = 15
-	}
-	if maxStatusWidth < 12 {
-		maxStatusWidth = 12
-	}
-	if maxProcessCountWidth < 8 {
-		maxProcessCountWidth = 8
-	}
-	if maxDetailsWidth < 15 {
-		maxDetailsWidth = 15
-	}
-
-	// 打印表格头部
-	headerFormat := fmt.Sprintf("│ %%-%ds │ %%-%ds │ %%%ds │ %%-%ds │\n",
-		maxHostnameWidth, maxStatusWidth, maxProcessCountWidth, maxDetailsWidth)
-	separatorFormat := fmt.Sprintf("├─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┤\n",
-		maxHostnameWidth, maxStatusWidth, maxProcessCountWidth, maxDetailsWidth)
-	topBorder := fmt.Sprintf("┌─%s─┬─%s─┬─%s─┬─%s─┐\n",
-		strings.Repeat("─", maxHostnameWidth),
-		strings.Repeat("─", maxStatusWidth),
-		strings.Repeat("─", maxProcessCountWidth),
-		strings.Repeat("─", maxDetailsWidth))
-	bottomBorder := fmt.Sprintf("└─%s─┴─%s─┴─%s─┴─%s─┘\n",
-		strings.Repeat("─", maxHostnameWidth),
-		strings.Repeat("─", maxStatusWidth),
-		strings.Repeat("─", maxProcessCountWidth),
-		strings.Repeat("─", maxDetailsWidth))
-
-	fmt.Print(topBorder)
-	fmt.Printf(headerFormat, "Hostname", "Status", "Process Count", "Details")
-	fmt.Printf(separatorFormat,
-		strings.Repeat("─", maxHostnameWidth),
-		strings.Repeat("─", maxStatusWidth),
-		strings.Repeat("─", maxProcessCountWidth),
-		strings.Repeat("─", maxDetailsWidth))
-
-	// 打印数据行
-	dataFormat := fmt.Sprintf("│ %%-%ds │ %%-%ds │ %%%dd │ %%-%ds │\n",
-		maxHostnameWidth, maxStatusWidth, maxProcessCountWidth, maxDetailsWidth)
+	fmt.Println("┌─────────────────────┬───────────────┬──────────────┬─────────────────┐")
+	fmt.Println("│ Hostname            │ Status        │ Process Count│ Details         │")
+	fmt.Println("├─────────────────────┼───────────────┼──────────────┼─────────────────┤")
 
 	for _, result := range results {
 		details := ""
@@ -295,17 +209,17 @@ func displayProbeResults(results []ProbeResult) {
 			details = "Connection failed"
 		}
 
-		fmt.Printf(dataFormat, result.Hostname, statusIcon, result.ProcessCount, details)
+		fmt.Printf("│ %-19s │ %-12s │ %12d │ %-15s │\n",
+			result.Hostname, statusIcon, result.ProcessCount, details)
 
 		// 如果有错误，在下一行显示错误信息
 		if result.Error != "" {
-			errorFormat := fmt.Sprintf("│ %%-%ds │ %%-%ds │ %%%ds │ %%-%ds │\n",
-				maxHostnameWidth, maxStatusWidth, maxProcessCountWidth, maxDetailsWidth)
-			fmt.Printf(errorFormat, "", "Error:", "", result.Error)
+			fmt.Printf("│ %-19s │ %-12s │ %12s │ %-15s │\n",
+				"", "Error:", "", result.Error)
 		}
 	}
 
-	fmt.Print(bottomBorder)
+	fmt.Println("└─────────────────────┴───────────────┴──────────────┴─────────────────┘")
 
 	// 显示总结信息
 	running := 0
@@ -325,6 +239,6 @@ func displayProbeResults(results []ProbeResult) {
 		}
 	}
 
-	fmt.Printf("Summary: %d hosts running (%d processes), %d completed, %d errors\n",
+	fmt.Printf("\nSummary: %d hosts running (%d processes), %d completed, %d errors\n",
 		running, totalProcesses, completed, errors)
 }
