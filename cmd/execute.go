@@ -110,6 +110,8 @@ func executeCollectStep(cfg *config.Config) bool {
 		return true
 	}
 
+	// --cleanup=true
+	cleanupRemote = true
 	fmt.Println("Collecting report files from remote hosts...")
 	err := execCollectCommand(cfg)
 	if err != nil {
