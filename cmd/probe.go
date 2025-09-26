@@ -85,9 +85,11 @@ func execProbeCommand(cfg *config.Config) {
 	fmt.Println()
 
 	isFirstProbe := true
+	var lastResults []ProbeResult
 
 	for {
 		results := probeAllHosts(allHosts)
+		lastResults = results
 
 		// 计算倒计时
 		remainingTime := testEndTime.Sub(time.Now())
@@ -125,16 +127,26 @@ func execProbeCommand(cfg *config.Config) {
 			break
 		}
 
-		// 等待下一次探测
+		// 使用每秒刷新的倒计时
 		nextProbeIn := probeInterval
 		if testDuration > 0 && remainingTime.Seconds() < float64(probeInterval) && remainingTime.Seconds() > 0 {
 			nextProbeIn = int(remainingTime.Seconds()) + 1
 		}
 
-		if !oneShot {
-			fmt.Printf("Next probe in %d seconds...\n", nextProbeIn)
+		// 每秒刷新倒计时和动态效果
+		for i := nextProbeIn; i > 0; i-- {
+			if i < nextProbeIn {
+				clearPreviousOutput()
+				displayProbeResults(lastResults, testEndTime.Sub(time.Now()), testDuration)
+			}
+			fmt.Printf("Next probe in %d seconds...\n", i)
+			time.Sleep(1 * time.Second)
+
+			// 检查是否提前完成
+			if testDuration > 0 && testEndTime.Sub(time.Now()) <= 0 {
+				break
+			}
 		}
-		time.Sleep(time.Duration(nextProbeIn) * time.Second)
 	}
 }
 
@@ -221,8 +233,8 @@ func probeHost(hostname string) ProbeResult {
 // clearPreviousOutput clears the previous output using ANSI escape sequences
 func clearPreviousOutput() {
 	// 移动光标到上方并清除内容
-	// 这里估算需要清除大约20行的内容（表格+摘要信息）
-	fmt.Print("\033[20A") // 向上移动20行
+	// 这里估算需要清除大约25行的内容（表格+摘要信息+倒计时行）
+	fmt.Print("\033[25A") // 向上移动25行
 	fmt.Print("\033[J")   // 清除从光标到屏幕结尾的内容
 }
 
@@ -240,33 +252,40 @@ func displayProbeResults(results []ProbeResult, remainingTime time.Duration, tes
 		}
 	}
 
-	// 增加列宽：Status和Details列各增加1/3
-	// 原来Status是11个字符，Details是11个字符
-	// 增加1/3后：Status约15个字符，Details约15个字符
-	fmt.Println("┌─────────────────────┬─────────────────┬──────────────┬─────────────────┐")
-	fmt.Println("│ Hostname            │ Status          │ Process Count│ Details         │")
-	fmt.Println("├─────────────────────┼─────────────────┼──────────────┼─────────────────┤")
+	// 修复表格对齐 - 为了适应emoji，需要调整Status列的宽度
+	// Status列需要更宽来容纳emoji字符
+	fmt.Println("┌─────────────────────┬──────────────────┬──────────────┬─────────────────┬──────────┐")
+	fmt.Println("│ Hostname            │ Status           │ Process Count│ Details         │ Activity │")
+	fmt.Println("├─────────────────────┼──────────────────┼──────────────┼─────────────────┼──────────┤")
+
+	// 简单的动态效果字符数组
+	activityChars := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	activityIndex := int(time.Now().Unix()) % len(activityChars)
 
 	for _, result := range results {
 		details := ""
 		statusIcon := ""
+		activity := " "
 
 		switch result.Status {
 		case "RUNNING":
 			statusIcon = "🟡 RUNNING"
+			activity = activityChars[activityIndex]
 			if result.ProcessCount > 0 {
 				details = fmt.Sprintf("%d process(es)", result.ProcessCount)
 			}
 		case "COMPLETED":
 			statusIcon = "✅ COMPLETED"
+			activity = "✓"
 			details = "No processes"
 		case "ERROR":
 			statusIcon = "❌ ERROR"
+			activity = "✗"
 			details = "Connection failed"
 		}
 
-		fmt.Printf("│ %-19s │ %-15s │ %12d │ %-15s │\n",
-			result.Hostname, statusIcon, result.ProcessCount, details)
+		fmt.Printf("│ %-19s │ %-16s │ %12d │ %-15s │ %-8s │\n",
+			result.Hostname, statusIcon, result.ProcessCount, details, activity)
 
 		// 如果有错误，在下一行显示错误信息
 		if result.Error != "" {
@@ -275,12 +294,12 @@ func displayProbeResults(results []ProbeResult, remainingTime time.Duration, tes
 			if len(errorMsg) > 15 {
 				errorMsg = errorMsg[:12] + "..."
 			}
-			fmt.Printf("│ %-19s │ %-15s │ %12s │ %-15s │\n",
-				"", "Error:", "", errorMsg)
+			fmt.Printf("│ %-19s │ %-16s │ %12s │ %-15s │ %-8s │\n",
+				"", "Error:", "", errorMsg, "")
 		}
 	}
 
-	fmt.Println("└─────────────────────┴─────────────────┴──────────────┴─────────────────┘")
+	fmt.Println("└─────────────────────┴──────────────────┴──────────────┴─────────────────┴──────────┘")
 
 	// 显示总结信息
 	running := 0
