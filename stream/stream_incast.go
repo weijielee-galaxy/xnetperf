@@ -53,6 +53,7 @@ func GenerateIncastScripts(cfg *config.Config) {
 					serverCmd := NewIBWriteBWCommandBuilder().
 						Host(sHost).
 						Device(sHca).
+						QueuePairNum(cfg.QpNum).
 						MessageSize(cfg.MessageSizeBytes).
 						Port(port).
 						RunInfinitely(cfg.Run.Infinitely).
@@ -65,7 +66,7 @@ func GenerateIncastScripts(cfg *config.Config) {
 					clientCmd := NewIBWriteBWCommandBuilder().
 						Host(cHost).
 						Device(cHca).
-						// QueuePairNum(cfg.QpNum).
+						QueuePairNum(cfg.QpNum).
 						MessageSize(cfg.MessageSizeBytes).
 						Port(port).
 						TargetIP(strings.TrimSpace(string(hostIP))).
