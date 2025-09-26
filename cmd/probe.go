@@ -67,8 +67,16 @@ func execProbeCommand(cfg *config.Config) {
 		return
 	}
 
+	// 获取测试持续时间和开始时间
+	testDuration := cfg.Run.DurationSeconds
+	testStartTime := time.Now()
+	testEndTime := testStartTime.Add(time.Duration(testDuration) * time.Second)
+
 	fmt.Printf("Probing ib_write_bw processes on %d hosts...\n", len(allHosts))
 	fmt.Printf("Probe interval: %d seconds\n", probeInterval)
+	if testDuration > 0 {
+		fmt.Printf("Test duration: %d seconds (estimated completion: %s)\n", testDuration, testEndTime.Format("15:04:05"))
+	}
 	if oneShot {
 		fmt.Println("Mode: One-shot probe")
 	} else {
@@ -76,9 +84,21 @@ func execProbeCommand(cfg *config.Config) {
 	}
 	fmt.Println()
 
+	isFirstProbe := true
+
 	for {
 		results := probeAllHosts(allHosts)
-		displayProbeResults(results)
+
+		// 计算倒计时
+		remainingTime := testEndTime.Sub(time.Now())
+
+		// 如果不是第一次探测，清除之前的输出
+		if !isFirstProbe && !oneShot {
+			clearPreviousOutput()
+		}
+
+		displayProbeResults(results, remainingTime, testDuration)
+		isFirstProbe = false
 
 		// 如果是一次性探测，直接退出
 		if oneShot {
@@ -99,9 +119,22 @@ func execProbeCommand(cfg *config.Config) {
 			break
 		}
 
+		// 检查是否已经超过测试时间
+		if testDuration > 0 && remainingTime <= 0 {
+			fmt.Println("⏰ Test duration completed!")
+			break
+		}
+
 		// 等待下一次探测
-		fmt.Printf("Waiting %d seconds for next probe...\n\n", probeInterval)
-		time.Sleep(time.Duration(probeInterval) * time.Second)
+		nextProbeIn := probeInterval
+		if testDuration > 0 && remainingTime.Seconds() < float64(probeInterval) && remainingTime.Seconds() > 0 {
+			nextProbeIn = int(remainingTime.Seconds()) + 1
+		}
+
+		if !oneShot {
+			fmt.Printf("Next probe in %d seconds...\n", nextProbeIn)
+		}
+		time.Sleep(time.Duration(nextProbeIn) * time.Second)
 	}
 }
 
@@ -185,11 +218,34 @@ func probeHost(hostname string) ProbeResult {
 	return result
 }
 
-func displayProbeResults(results []ProbeResult) {
-	fmt.Printf("=== Probe Results (%s) ===\n", time.Now().Format("15:04:05"))
-	fmt.Println("┌─────────────────────┬─────────────┬──────────────┬─────────────┐")
-	fmt.Println("│ Hostname            │ Status      │ Process Count│ Details     │")
-	fmt.Println("├─────────────────────┼─────────────┼──────────────┼─────────────┤")
+// clearPreviousOutput clears the previous output using ANSI escape sequences
+func clearPreviousOutput() {
+	// 移动光标到上方并清除内容
+	// 这里估算需要清除大约20行的内容（表格+摘要信息）
+	fmt.Print("\033[20A") // 向上移动20行
+	fmt.Print("\033[J")   // 清除从光标到屏幕结尾的内容
+}
+
+func displayProbeResults(results []ProbeResult, remainingTime time.Duration, testDuration int) {
+	// 显示当前时间和倒计时信息
+	currentTime := time.Now().Format("15:04:05")
+	fmt.Printf("=== Probe Results (%s) ===\n", currentTime)
+
+	if testDuration > 0 {
+		if remainingTime > 0 {
+			fmt.Printf("⏰ Time remaining: %02d:%02d (%.0f seconds)\n",
+				int(remainingTime.Minutes()), int(remainingTime.Seconds())%60, remainingTime.Seconds())
+		} else {
+			fmt.Printf("⏰ Test duration completed!\n")
+		}
+	}
+
+	// 增加列宽：Status和Details列各增加1/3
+	// 原来Status是11个字符，Details是11个字符
+	// 增加1/3后：Status约15个字符，Details约15个字符
+	fmt.Println("┌─────────────────────┬─────────────────┬──────────────┬─────────────────┐")
+	fmt.Println("│ Hostname            │ Status          │ Process Count│ Details         │")
+	fmt.Println("├─────────────────────┼─────────────────┼──────────────┼─────────────────┤")
 
 	for _, result := range results {
 		details := ""
@@ -209,17 +265,22 @@ func displayProbeResults(results []ProbeResult) {
 			details = "Connection failed"
 		}
 
-		fmt.Printf("│ %-19s │ %-11s │ %12d │ %-11s │\n",
+		fmt.Printf("│ %-19s │ %-15s │ %12d │ %-15s │\n",
 			result.Hostname, statusIcon, result.ProcessCount, details)
 
 		// 如果有错误，在下一行显示错误信息
 		if result.Error != "" {
-			fmt.Printf("│ %-19s │ %-11s │ %12s │ %-11s │\n",
-				"", "Error:", "", result.Error)
+			errorMsg := result.Error
+			// 如果错误信息太长，截断它
+			if len(errorMsg) > 15 {
+				errorMsg = errorMsg[:12] + "..."
+			}
+			fmt.Printf("│ %-19s │ %-15s │ %12s │ %-15s │\n",
+				"", "Error:", "", errorMsg)
 		}
 	}
 
-	fmt.Println("└─────────────────────┴─────────────┴──────────────┴─────────────┘")
+	fmt.Println("└─────────────────────┴─────────────────┴──────────────┴─────────────────┘")
 
 	// 显示总结信息
 	running := 0
