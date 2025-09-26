@@ -8,7 +8,7 @@ all: build
 # The 'go build' command automatically creates the 'build' directory if it doesn't exist.
 build:
 	@echo "Building executable..."
-	@go build -o build/xnetperf ./cmd/xnetperf.go
+	@go build -o build/xnetperf main.go
 	@echo "Executable created: build/xnetperf"
 
 # Build and run the application directly for quick local testing.

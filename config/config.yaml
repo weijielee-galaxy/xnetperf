@@ -1,19 +1,30 @@
 start_port: 20000
-duration_seconds: 1
-stream_type: "fullmesh"
-qp_num : 10
+stream_type: "p2p" # "fullmesh" or "incast" or "p2p"
+qp_num: 10
 message_size_bytes: 4096
+output_base: "./generated_scripts"
+waiting_time_seconds: 15 # Time to wait before starting client scripts
+speed: 400 # in Gbps, used for theoretical bandwidth calculation
+
+report:
+  enable: true
+  dir: "/root"
+
+run:
+  infinitely: true
+  duration_seconds: 10
 
 server:
   hostname:
-  - "css-g88-001"
+  - "cetus-g88-094"
+  - "cetus-g88-065"
   hca:
   - "mlx5_0"
   - "mlx5_1"
-
 client:
   hostname:
-  - "css-g88-002"
+  - "cetus-g88-061"
+  - "cetus-g88-062"
   hca:
   - "mlx5_0"
   - "mlx5_1"
