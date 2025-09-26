@@ -1,5 +1,5 @@
 start_port: 20000
-stream_type: "incast" # "fullmesh" or "incast"
+stream_type: "incast" # "fullmesh" or "incast" or "p2p"
 qp_num : 10
 message_size_bytes: 4096
 output_base: "./generated_scripts"

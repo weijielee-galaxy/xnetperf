@@ -1,5 +1,5 @@
 *.sh
 ./build/
 .github
-area.md
+area*.md
 build/reports
