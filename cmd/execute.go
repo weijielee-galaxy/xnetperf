@@ -53,6 +53,13 @@ func runExecute(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
+	// Special handling for P2P stream type
+	// 不需要展示效果
+	if cfg.StreamType == config.P2P {
+		fmt.Println("⚠️  P2P stream type detected. Skipping probe step as tests are short-lived.")
+		os.Exit(0)
+	}
+
 	// Step 2: Execute probe command
 	fmt.Println("\n🔍 Step 2/4: Monitoring test progress...")
 	if !executeProbeStep(cfg) {

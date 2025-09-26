@@ -23,9 +23,9 @@ func ValidateP2PConfig(cfg *config.Config) error {
 	}
 
 	// Check if P2P with infinitely=true, which is not supported
-	if cfg.Run.Infinitely {
-		return fmt.Errorf("P2P mode does not support infinitely=true. Please set run.infinitely=false in config file")
-	}
+	// if cfg.Run.Infinitely {
+	// 	return fmt.Errorf("P2P mode does not support infinitely=true. Please set run.infinitely=false in config file")
+	// }
 
 	return nil
 }
@@ -114,7 +114,7 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 		QueuePairNum(cfg.QpNum).
 		MessageSize(cfg.MessageSizeBytes).
 		Port(port).
-		RunInfinitely(false). // P2P mode always uses duration
+		RunInfinitely(cfg.Run.Infinitely).
 		DurationSeconds(cfg.Run.DurationSeconds).
 		Bidirectional(true). // P2P mode uses bidirectional testing
 		Report(cfg.Report.Enable).
@@ -129,7 +129,7 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 		MessageSize(cfg.MessageSizeBytes).
 		Port(port).
 		TargetIP(serverIP).
-		RunInfinitely(false). // P2P mode always uses duration
+		RunInfinitely(cfg.Run.Infinitely).
 		DurationSeconds(cfg.Run.DurationSeconds).
 		Bidirectional(true). // P2P mode uses bidirectional testing
 		Report(cfg.Report.Enable).

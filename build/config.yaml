@@ -11,7 +11,7 @@ report:
   dir: "/root"
 
 run:
-  infinitely: false
+  infinitely: true
   duration_seconds: 10
 
 server:
