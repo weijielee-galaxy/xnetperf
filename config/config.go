@@ -21,6 +21,7 @@ type Config struct {
 	MessageSizeBytes   int          `yaml:"message_size_bytes"`
 	OutputBase         string       `yaml:"output_base"`
 	WaitingTimeSeconds int          `yaml:"waiting_time_seconds"`
+	Speed              float64      `yaml:"speed"` // in Gbps
 	Report             Report       `yaml:"report"`
 	Run                Run          `yaml:"run"`
 	Server             ServerConfig `yaml:"server"`

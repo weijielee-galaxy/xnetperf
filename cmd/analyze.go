@@ -3,14 +3,13 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"xnetperf/config"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // Report represents the structure of a JSON report file
@@ -51,10 +50,10 @@ func init() {
 }
 
 func runAnalyze(cmd *cobra.Command, args []string) {
-	// Get config
-	configFile := viper.GetString("config")
-	if configFile == "" {
-		configFile = "config/config.yaml"
+	cfg, err := config.LoadConfig(cfgFile)
+	if err != nil {
+		fmt.Printf("Error reading config: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Use the reports directory from flag
@@ -74,11 +73,11 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 	}
 
 	// Display results
-	displayResults(clientData, serverData)
+	displayResults(clientData, serverData, cfg.Speed)
 
 	// Generate markdown file if requested
 	if generateMD {
-		err := generateMarkdownTable(clientData, serverData)
+		err := generateMarkdownTable(clientData, serverData, cfg.Speed)
 		if err != nil {
 			fmt.Printf("Error generating markdown file: %v\n", err)
 		} else {
@@ -112,7 +111,7 @@ func collectReportData(reportsDir string) (map[string]map[string]*DeviceData, ma
 		device := parts[3] + "_" + parts[4] // Reconstruct device name like mlx5_0
 
 		// Read and parse JSON file
-		content, err := ioutil.ReadFile(path)
+		content, err := os.ReadFile(path)
 		if err != nil {
 			fmt.Printf("Error reading file %s: %v\n", path, err)
 			return nil
@@ -157,11 +156,11 @@ func collectReportData(reportsDir string) (map[string]map[string]*DeviceData, ma
 	return clientData, serverData, err
 }
 
-func displayResults(clientData, serverData map[string]map[string]*DeviceData) {
+func displayResults(clientData, serverData map[string]map[string]*DeviceData, specSpeed float64) {
 	fmt.Println("=== Network Performance Analysis ===")
 
 	// 计算总服务端带宽和客户端数量
-	totalServerBW := calculateTotalServerBandwidth(serverData)
+	totalServerBW := calculateTotalServerBandwidth(serverData, specSpeed)
 	clientCount := calculateClientCount(clientData)
 	theoreticalBWPerClient := float64(0)
 	if clientCount > 0 {
@@ -231,11 +230,11 @@ func displayDataTable(dataMap map[string]map[string]*DeviceData, isServer bool) 
 	}
 }
 
-func generateMarkdownTable(clientData, serverData map[string]map[string]*DeviceData) error {
+func generateMarkdownTable(clientData, serverData map[string]map[string]*DeviceData, specSpeed float64) error {
 	content := "# Network Performance Analysis\n\n"
 
 	// 计算理论带宽
-	totalServerBW := calculateTotalServerBandwidth(serverData)
+	totalServerBW := calculateTotalServerBandwidth(serverData, specSpeed)
 	clientCount := calculateClientCount(clientData)
 	theoreticalBWPerClient := float64(0)
 	if clientCount > 0 {
@@ -259,7 +258,7 @@ func generateMarkdownTable(clientData, serverData map[string]map[string]*DeviceD
 
 	content += generateMarkdownTableContent(serverData)
 
-	return ioutil.WriteFile("network_performance_analysis.md", []byte(content), 0644)
+	return os.WriteFile("network_performance_analysis.md", []byte(content), 0644)
 }
 
 func generateMarkdownTableContent(dataMap map[string]map[string]*DeviceData) string {
@@ -301,11 +300,11 @@ func generateMarkdownTableContent(dataMap map[string]map[string]*DeviceData) str
 }
 
 // calculateTotalServerBandwidth 计算总服务端带宽
-func calculateTotalServerBandwidth(serverData map[string]map[string]*DeviceData) float64 {
+func calculateTotalServerBandwidth(serverData map[string]map[string]*DeviceData, specSpeed float64) float64 {
 	total := float64(0)
 	for _, devices := range serverData {
-		for _, data := range devices {
-			total += data.BWSum
+		for range devices {
+			total += specSpeed
 		}
 	}
 	return total

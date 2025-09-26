@@ -139,7 +139,7 @@ func executeAnalyzeStep(cfg *config.Config) bool {
 	}
 
 	// Display results using analyze.go function
-	displayResults(clientData, serverData)
+	displayResults(clientData, serverData, cfg.Speed)
 
 	fmt.Println("✅ Analysis completed successfully")
 	return true
