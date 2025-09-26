@@ -131,15 +131,25 @@ func executeAnalyzeStep(cfg *config.Config) bool {
 		return false
 	}
 
-	// Collect report data using analyze.go function
-	clientData, serverData, err := collectReportData(reportsDir)
-	if err != nil {
-		fmt.Printf("❌ Error collecting report data: %v\n", err)
-		return false
+	// Handle different stream types with separate analysis functions
+	switch cfg.StreamType {
+	case config.P2P:
+		// P2P analysis
+		p2pData, err := collectP2PReportData(reportsDir)
+		if err != nil {
+			fmt.Printf("❌ Error collecting P2P report data: %v\n", err)
+			return false
+		}
+		displayP2PResults(p2pData)
+	default:
+		// Traditional fullmesh/incast analysis
+		clientData, serverData, err := collectReportData(reportsDir)
+		if err != nil {
+			fmt.Printf("❌ Error collecting report data: %v\n", err)
+			return false
+		}
+		displayResults(clientData, serverData, cfg.Speed)
 	}
-
-	// Display results using analyze.go function
-	displayResults(clientData, serverData, cfg.Speed)
 
 	fmt.Println("✅ Analysis completed successfully")
 	return true

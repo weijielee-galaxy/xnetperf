@@ -21,6 +21,7 @@ type IBWriteBWCommandBuilder struct {
 	sshWrapper      bool
 	report          bool
 	outputFileName  string
+	bidirectional   bool // 新增双向测试参数
 }
 
 // NewIBWriteBWCommandBuilder creates a new command builder
@@ -118,6 +119,12 @@ func (b *IBWriteBWCommandBuilder) OutputFileName(filename string) *IBWriteBWComm
 	return b
 }
 
+// Bidirectional sets whether to run bidirectional test (adds -b flag)
+func (b *IBWriteBWCommandBuilder) Bidirectional(enable bool) *IBWriteBWCommandBuilder {
+	b.bidirectional = enable
+	return b
+}
+
 // String builds and returns the complete command string
 func (b *IBWriteBWCommandBuilder) String() string {
 	// Validate that outputFileName is provided when report is enabled and not running infinitely
@@ -153,6 +160,10 @@ func (b *IBWriteBWCommandBuilder) String() string {
 
 	if b.port > 0 {
 		cmd.WriteString(fmt.Sprintf(" -p %d", b.port))
+	}
+
+	if b.bidirectional {
+		cmd.WriteString(" -b")
 	}
 
 	if b.targetIP != "" {

@@ -59,6 +59,10 @@ func (c *Config) IsInCast() bool {
 	return c.StreamType == InCast
 }
 
+func (c *Config) IsP2P() bool {
+	return c.StreamType == P2P
+}
+
 func (c *Config) OutputDir() string {
 	return fmt.Sprintf("%s_%s", c.OutputBase, c.StreamType)
 }
