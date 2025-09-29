@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"xnetperf/config"
 
@@ -477,6 +479,56 @@ type P2PDeviceData struct {
 	Count    int
 }
 
+// parseCustomFormat parses the custom format report files
+func parseCustomFormat(content []byte) (*Report, error) {
+	text := string(content)
+
+	// Create regex patterns to extract values
+	deviceRegex := regexp.MustCompile(`Device:\s*"([^"]+)"`)
+	bwAverageRegex := regexp.MustCompile(`BW_average:\s*([0-9]+\.?[0-9]*)`)
+	testRegex := regexp.MustCompile(`test:\s*([^,\n]+)`)
+
+	report := &Report{}
+
+	// Extract Device
+	if matches := deviceRegex.FindStringSubmatch(text); len(matches) > 1 {
+		report.TestInfo.Device = matches[1]
+	}
+
+	// Extract Test
+	if matches := testRegex.FindStringSubmatch(text); len(matches) > 1 {
+		report.TestInfo.Test = strings.TrimSpace(matches[1])
+	}
+
+	// Extract BW_average
+	if matches := bwAverageRegex.FindStringSubmatch(text); len(matches) > 1 {
+		bw, err := strconv.ParseFloat(matches[1], 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse BW_average: %v", err)
+		}
+		report.Results.BWAverage = bw
+	}
+
+	return report, nil
+}
+
+// parseReportFile attempts to parse both JSON and custom formats
+func parseReportFile(path string) (*Report, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("error reading file: %v", err)
+	}
+
+	// First try JSON parsing
+	var report Report
+	if err := json.Unmarshal(content, &report); err == nil {
+		return &report, nil
+	}
+
+	// If JSON parsing fails, try custom format
+	return parseCustomFormat(content)
+}
+
 // collectP2PReportData collects report data specifically for P2P mode
 func collectP2PReportData(reportsDir string) (map[string]map[string]*P2PDeviceData, error) {
 	p2pData := make(map[string]map[string]*P2PDeviceData)
@@ -512,15 +564,20 @@ func collectP2PReportData(reportsDir string) (map[string]map[string]*P2PDeviceDa
 		device := parts[2] + "_" + parts[3] // Reconstruct device name like mlx5_0
 
 		// Read and parse JSON file
-		content, err := os.ReadFile(path)
-		if err != nil {
-			fmt.Printf("Error reading P2P file %s: %v\n", path, err)
-			return nil
-		}
+		// content, err := os.ReadFile(path)
+		// if err != nil {
+		// 	fmt.Printf("Error reading P2P file %s: %v\n", path, err)
+		// 	return nil
+		// }
 
-		var report Report
-		if err := json.Unmarshal(content, &report); err != nil {
-			fmt.Printf("Error parsing P2P JSON file %s: %v\n", path, err)
+		// var report Report
+		// if err := json.Unmarshal(content, &report); err != nil {
+		// 	fmt.Printf("Error parsing P2P JSON file %s: %v\n", path, err)
+		// 	return nil
+		// }
+		report, err := parseReportFile(path)
+		if err != nil {
+			fmt.Printf("Error parsing P2P file %s: %v\n", path, err)
 			return nil
 		}
 
