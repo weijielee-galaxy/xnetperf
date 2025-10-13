@@ -14,6 +14,8 @@ func TestDisplayPrecheckResults(t *testing.T) {
 			PhysState: "LinkUp",
 			State:     "ACTIVE",
 			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
 			IsHealthy: true,
 			Error:     "",
 		},
@@ -23,6 +25,8 @@ func TestDisplayPrecheckResults(t *testing.T) {
 			PhysState: "Polling",
 			State:     "INIT",
 			Speed:     "100 Gb/sec (1X HDR)",
+			FwVer:     "28.43.2025",
+			BoardId:   "MT_0000000845",
 			IsHealthy: false,
 			Error:     "",
 		},
@@ -32,6 +36,8 @@ func TestDisplayPrecheckResults(t *testing.T) {
 			PhysState: "",
 			State:     "",
 			Speed:     "",
+			FwVer:     "",
+			BoardId:   "",
 			IsHealthy: false,
 			Error:     "SSH connection failed",
 		},
@@ -41,6 +47,8 @@ func TestDisplayPrecheckResults(t *testing.T) {
 			PhysState: "LinkUp",
 			State:     "ACTIVE",
 			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
 			IsHealthy: true,
 			Error:     "",
 		},
@@ -166,6 +174,8 @@ func TestDisplayPrecheckResultsWithColors(t *testing.T) {
 			PhysState: "LinkUp",
 			State:     "ACTIVE",
 			Speed:     "200 Gb/sec (2X NDR)", // 这个速度出现2次，应该是绿色
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
 			IsHealthy: true,
 			Error:     "",
 		},
@@ -175,6 +185,8 @@ func TestDisplayPrecheckResultsWithColors(t *testing.T) {
 			PhysState: "Polling",
 			State:     "INIT",
 			Speed:     "100 Gb/sec (1X HDR)", // 这个速度出现1次，应该是红色
+			FwVer:     "28.43.2025",
+			BoardId:   "MT_0000000845",
 			IsHealthy: false,
 			Error:     "",
 		},
@@ -184,6 +196,8 @@ func TestDisplayPrecheckResultsWithColors(t *testing.T) {
 			PhysState: "LinkUp",
 			State:     "ACTIVE",
 			Speed:     "200 Gb/sec (2X NDR)", // 这个速度出现2次，应该是绿色
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
 			IsHealthy: true,
 			Error:     "",
 		},
@@ -193,6 +207,8 @@ func TestDisplayPrecheckResultsWithColors(t *testing.T) {
 			PhysState: "",
 			State:     "",
 			Speed:     "",
+			FwVer:     "",
+			BoardId:   "",
 			IsHealthy: false,
 			Error:     "SSH connection failed",
 		},
@@ -291,5 +307,104 @@ func TestRemoveAnsiCodes(t *testing.T) {
 				t.Errorf("removeAnsiCodes(%q) = %q, expected %q", tc.input, result, tc.expected)
 			}
 		})
+	}
+}
+
+// TestSpeedConsistencyCheck 测试 v0.0.3 的 speed 一致性检查逻辑
+func TestSpeedConsistencyCheck(t *testing.T) {
+	// 模拟 execPrecheckCommand 的部分逻辑来测试 speed 一致性
+
+	// 测试场景 1: 所有 speed 相同，应该通过
+	resultsAllSame := []PrecheckResult{
+		{
+			Hostname:  "server-001",
+			HCA:       "mlx5_0",
+			Speed:     "200 Gb/sec (2X NDR)",
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "server-002",
+			HCA:       "mlx5_1",
+			Speed:     "200 Gb/sec (2X NDR)",
+			IsHealthy: true,
+			Error:     "",
+		},
+	}
+
+	// 检查所有 speed 是否相同
+	allSpeedsSame := true
+	if len(resultsAllSame) > 1 {
+		firstSpeed := ""
+		for _, result := range resultsAllSame {
+			if result.Error == "" && result.Speed != "" {
+				if firstSpeed == "" {
+					firstSpeed = result.Speed
+				} else if result.Speed != firstSpeed {
+					allSpeedsSame = false
+					break
+				}
+			}
+		}
+	}
+
+	allHealthy := true
+	for _, result := range resultsAllSame {
+		if !result.IsHealthy {
+			allHealthy = false
+			break
+		}
+	}
+
+	success := allHealthy && allSpeedsSame
+	if !success {
+		t.Error("Expected success when all HCAs are healthy and speeds are same")
+	}
+
+	// 测试场景 2: speed 不同，应该失败
+	resultsDifferent := []PrecheckResult{
+		{
+			Hostname:  "server-001",
+			HCA:       "mlx5_0",
+			Speed:     "200 Gb/sec (2X NDR)",
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "server-002",
+			HCA:       "mlx5_1",
+			Speed:     "100 Gb/sec (1X HDR)", // 不同的速度
+			IsHealthy: true,
+			Error:     "",
+		},
+	}
+
+	// 检查所有 speed 是否相同
+	allSpeedsSame = true
+	if len(resultsDifferent) > 1 {
+		firstSpeed := ""
+		for _, result := range resultsDifferent {
+			if result.Error == "" && result.Speed != "" {
+				if firstSpeed == "" {
+					firstSpeed = result.Speed
+				} else if result.Speed != firstSpeed {
+					allSpeedsSame = false
+					break
+				}
+			}
+		}
+	}
+
+	allHealthy = true
+	for _, result := range resultsDifferent {
+		if !result.IsHealthy {
+			allHealthy = false
+			break
+		}
+	}
+
+	success = allHealthy && allSpeedsSame
+	if success {
+		t.Error("Expected failure when speeds are different")
 	}
 }

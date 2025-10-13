@@ -27,6 +27,8 @@ type PrecheckResult struct {
 	PhysState string
 	State     string
 	Speed     string
+	FwVer     string
+	BoardId   string
 	IsHealthy bool
 	Error     string
 }
@@ -117,7 +119,23 @@ func execPrecheckCommand(cfg *config.Config) bool {
 		}
 	}
 
-	return allHealthy
+	// v0.0.3: 检查所有 speed 是否相同
+	allSpeedsSame := true
+	if len(results) > 1 {
+		firstSpeed := ""
+		for _, result := range results {
+			if result.Error == "" && result.Speed != "" {
+				if firstSpeed == "" {
+					firstSpeed = result.Speed
+				} else if result.Speed != firstSpeed {
+					allSpeedsSame = false
+					break
+				}
+			}
+		}
+	}
+
+	return allHealthy && allSpeedsSame
 }
 
 func precheckAllHCAs(checkItems []struct {
@@ -180,15 +198,39 @@ func precheckHCA(hostname, hca string) PrecheckResult {
 		return result
 	}
 
+	// 检查固件版本
+	fwVerCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/fw_ver", hca)
+	cmd = exec.Command("ssh", hostname, fwVerCmd)
+	fwVerOutput, err := cmd.CombinedOutput()
+
+	if err != nil {
+		result.Error = fmt.Sprintf("Failed to check fw_ver: %v", err)
+		return result
+	}
+
+	// 检查板卡ID
+	boardIdCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/board_id", hca)
+	cmd = exec.Command("ssh", hostname, boardIdCmd)
+	boardIdOutput, err := cmd.CombinedOutput()
+
+	if err != nil {
+		result.Error = fmt.Sprintf("Failed to check board_id: %v", err)
+		return result
+	}
+
 	// 解析输出
 	physStateStr := strings.TrimSpace(string(physOutput))
 	stateStr := strings.TrimSpace(string(stateOutput))
 	speedStr := strings.TrimSpace(string(speedOutput))
+	fwVerStr := strings.TrimSpace(string(fwVerOutput))
+	boardIdStr := strings.TrimSpace(string(boardIdOutput))
 
 	// 去掉状态前面的数字和冒号，只保留有意义的文本
 	result.PhysState = cleanStateString(physStateStr)
 	result.State = cleanStateString(stateStr)
 	result.Speed = speedStr // 保持速度信息的原始格式
+	result.FwVer = fwVerStr
+	result.BoardId = boardIdStr
 
 	// 判断是否健康：需要同时满足 LinkUp 和 ACTIVE
 	isLinkUp := strings.Contains(physStateStr, "LinkUp")
@@ -268,6 +310,8 @@ func displayPrecheckResults(results []PrecheckResult) {
 	maxPhysStateWidth := len("Physical State")
 	maxStateWidth := len("Logical State")
 	maxSpeedWidth := len("Speed")
+	maxFwVerWidth := len("FW Version")
+	maxBoardIdWidth := len("Board ID")
 	maxStatusWidth := len("Status")
 
 	for _, result := range results {
@@ -285,6 +329,12 @@ func displayPrecheckResults(results []PrecheckResult) {
 		}
 		if len(result.Speed) > maxSpeedWidth {
 			maxSpeedWidth = len(result.Speed)
+		}
+		if len(result.FwVer) > maxFwVerWidth {
+			maxFwVerWidth = len(result.FwVer)
+		}
+		if len(result.BoardId) > maxBoardIdWidth {
+			maxBoardIdWidth = len(result.BoardId)
 		}
 
 		// 计算状态文本长度，包含符号前缀（不含颜色代码）
@@ -317,41 +367,53 @@ func displayPrecheckResults(results []PrecheckResult) {
 	if maxSpeedWidth < 15 {
 		maxSpeedWidth = 15
 	}
+	if maxFwVerWidth < 12 {
+		maxFwVerWidth = 12
+	}
+	if maxBoardIdWidth < 15 {
+		maxBoardIdWidth = 15
+	}
 	if maxStatusWidth < 10 {
 		maxStatusWidth = 10
 	}
 
-	// 生成表格格式（6列：Hostname, HCA, Physical State, Logical State, Speed, Status）
-	headerFormat := fmt.Sprintf("│ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │\n",
-		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxSpeedWidth, maxStatusWidth)
-	separatorFormat := fmt.Sprintf("├─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┤\n",
-		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxSpeedWidth, maxStatusWidth)
+	// 生成表格格式（8列：Hostname, HCA, Physical State, Logical State, Speed, FW Version, Board ID, Status）
+	headerFormat := fmt.Sprintf("│ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │\n",
+		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxSpeedWidth, maxFwVerWidth, maxBoardIdWidth, maxStatusWidth)
+	separatorFormat := fmt.Sprintf("├─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┤\n",
+		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxSpeedWidth, maxFwVerWidth, maxBoardIdWidth, maxStatusWidth)
 
 	// 生成边框
-	topBorder := fmt.Sprintf("┌─%s─┬─%s─┬─%s─┬─%s─┬─%s─┬─%s─┐\n",
+	topBorder := fmt.Sprintf("┌─%s─┬─%s─┬─%s─┬─%s─┬─%s─┬─%s─┬─%s─┬─%s─┐\n",
 		strings.Repeat("─", maxHostnameWidth),
 		strings.Repeat("─", maxHCAWidth),
 		strings.Repeat("─", maxPhysStateWidth),
 		strings.Repeat("─", maxStateWidth),
 		strings.Repeat("─", maxSpeedWidth),
+		strings.Repeat("─", maxFwVerWidth),
+		strings.Repeat("─", maxBoardIdWidth),
 		strings.Repeat("─", maxStatusWidth))
-	bottomBorder := fmt.Sprintf("└─%s─┴─%s─┴─%s─┴─%s─┴─%s─┴─%s─┘\n",
+	bottomBorder := fmt.Sprintf("└─%s─┴─%s─┴─%s─┴─%s─┴─%s─┴─%s─┴─%s─┴─%s─┘\n",
 		strings.Repeat("─", maxHostnameWidth),
 		strings.Repeat("─", maxHCAWidth),
 		strings.Repeat("─", maxPhysStateWidth),
 		strings.Repeat("─", maxStateWidth),
 		strings.Repeat("─", maxSpeedWidth),
+		strings.Repeat("─", maxFwVerWidth),
+		strings.Repeat("─", maxBoardIdWidth),
 		strings.Repeat("─", maxStatusWidth))
 
 	// 打印表格
 	fmt.Print(topBorder)
-	fmt.Printf(headerFormat, "Hostname", "HCA", "Physical State", "Logical State", "Speed", "Status")
+	fmt.Printf(headerFormat, "Hostname", "HCA", "Physical State", "Logical State", "Speed", "FW Version", "Board ID", "Status")
 	fmt.Printf(separatorFormat,
 		strings.Repeat("─", maxHostnameWidth),
 		strings.Repeat("─", maxHCAWidth),
 		strings.Repeat("─", maxPhysStateWidth),
 		strings.Repeat("─", maxStateWidth),
 		strings.Repeat("─", maxSpeedWidth),
+		strings.Repeat("─", maxFwVerWidth),
+		strings.Repeat("─", maxBoardIdWidth),
 		strings.Repeat("─", maxStatusWidth))
 
 	// 打印数据行
@@ -359,6 +421,8 @@ func displayPrecheckResults(results []PrecheckResult) {
 		physState := result.PhysState
 		logicalState := result.State
 		speed := result.Speed
+		fwVer := result.FwVer
+		boardId := result.BoardId
 
 		// 根据状态着色
 		var coloredStatus string
@@ -367,9 +431,11 @@ func displayPrecheckResults(results []PrecheckResult) {
 			physState = "N/A"
 			logicalState = "N/A"
 			speed = "N/A"
+			fwVer = "N/A"
+			boardId = "N/A"
 			coloredStatus = ColorYellow + "[!] ERROR" + ColorReset
 		} else if result.IsHealthy {
-			coloredStatus = ColorGreen + "[✓] HEALTHY  " + ColorReset
+			coloredStatus = ColorGreen + "[✓] HEALTHY" + ColorReset
 		} else {
 			coloredStatus = ColorRed + "[X] UNHEALTHY" + ColorReset
 		}
@@ -390,12 +456,14 @@ func displayPrecheckResults(results []PrecheckResult) {
 		}
 
 		// 使用固定格式，不依赖颜色代码的长度
-		fmt.Printf("│ %-*s │ %-*s │ %-*s │ %-*s │ %s │ %s │\n",
+		fmt.Printf("│ %-*s │ %-*s │ %-*s │ %-*s │ %s │ %-*s │ %-*s │ %s │\n",
 			maxHostnameWidth, result.Hostname,
 			maxHCAWidth, result.HCA,
 			maxPhysStateWidth, physState,
 			maxStateWidth, logicalState,
 			padStringWithColor(coloredSpeed, maxSpeedWidth),
+			maxFwVerWidth, fwVer,
+			maxBoardIdWidth, boardId,
 			padStringWithColor(coloredStatus, maxStatusWidth))
 	}
 
