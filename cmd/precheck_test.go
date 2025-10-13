@@ -463,3 +463,251 @@ func TestDisplayPrecheckResultsV004(t *testing.T) {
 	t.Log("Testing displayPrecheckResults with v0.0.4 features (sorting, merging, coloring):")
 	displayPrecheckResults(results)
 }
+
+// TestDisplayPrecheckResultsMultipleHosts 测试多主机多HCA场景
+func TestDisplayPrecheckResultsMultipleHosts(t *testing.T) {
+	// 模拟真实环境：5个主机，每个主机3-4个HCA，包含不同的状态
+	results := []PrecheckResult{
+		// node-001: 4个HCA，全部健康
+		{
+			Hostname:  "node-001",
+			HCA:       "mlx5_0",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "node-001",
+			HCA:       "mlx5_1",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "node-001",
+			HCA:       "mlx5_2",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "node-001",
+			HCA:       "mlx5_3",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		// node-002: 4个HCA，其中一个不健康
+		{
+			Hostname:  "node-002",
+			HCA:       "mlx5_0",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "node-002",
+			HCA:       "mlx5_1",
+			PhysState: "Polling",
+			State:     "INIT",
+			Speed:     "100 Gb/sec (1X HDR)", // 不同速度，应该标红
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: false,
+			Error:     "",
+		},
+		{
+			Hostname:  "node-002",
+			HCA:       "mlx5_2",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "node-002",
+			HCA:       "mlx5_3",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		// node-003: 3个HCA，有不同的固件版本
+		{
+			Hostname:  "node-003",
+			HCA:       "mlx5_0",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2025", // 不同版本，应该标黄
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "node-003",
+			HCA:       "mlx5_1",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "node-003",
+			HCA:       "mlx5_2",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		// node-004: 4个HCA，有不同的板卡ID
+		{
+			Hostname:  "node-004",
+			HCA:       "mlx5_0",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000845", // 不同板卡，应该标黄
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "node-004",
+			HCA:       "mlx5_1",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "node-004",
+			HCA:       "mlx5_2",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "node-004",
+			HCA:       "mlx5_3",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		// node-005: 3个HCA，其中一个连接错误
+		{
+			Hostname:  "node-005",
+			HCA:       "mlx5_0",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "node-005",
+			HCA:       "mlx5_1",
+			PhysState: "",
+			State:     "",
+			Speed:     "",
+			FwVer:     "",
+			BoardId:   "",
+			IsHealthy: false,
+			Error:     "SSH connection timeout",
+		},
+		{
+			Hostname:  "node-005",
+			HCA:       "mlx5_2",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",
+			BoardId:   "MT_0000000844",
+			IsHealthy: true,
+			Error:     "",
+		},
+	}
+
+	// 测试显示函数
+	t.Log("Testing displayPrecheckResults with multiple hosts and HCAs:")
+	displayPrecheckResults(results)
+
+	// 验证统计信息
+	healthy := 0
+	unhealthy := 0
+	errors := 0
+
+	for _, result := range results {
+		if result.Error != "" {
+			errors++
+		} else if result.IsHealthy {
+			healthy++
+		} else {
+			unhealthy++
+		}
+	}
+
+	expectedHealthy := 16
+	expectedUnhealthy := 1
+	expectedErrors := 1
+
+	if healthy != expectedHealthy {
+		t.Errorf("Expected %d healthy HCAs, got %d", expectedHealthy, healthy)
+	}
+
+	if unhealthy != expectedUnhealthy {
+		t.Errorf("Expected %d unhealthy HCAs, got %d", expectedUnhealthy, unhealthy)
+	}
+
+	if errors != expectedErrors {
+		t.Errorf("Expected %d error HCAs, got %d", expectedErrors, errors)
+	}
+
+	t.Logf("Statistics: %d healthy, %d unhealthy, %d errors (Total: %d HCAs)",
+		healthy, unhealthy, errors, len(results))
+}
