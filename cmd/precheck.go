@@ -1,0 +1,319 @@
+package cmd
+
+import (
+	"fmt"
+	"os/exec"
+	"strings"
+	"sync"
+	"time"
+
+	"xnetperf/config"
+
+	"github.com/spf13/cobra"
+)
+
+// PrecheckResult 表示预检查结果
+type PrecheckResult struct {
+	Hostname  string
+	HCA       string
+	PhysState string
+	State     string
+	IsHealthy bool
+	Error     string
+}
+
+var precheckCmd = &cobra.Command{
+	Use:   "precheck",
+	Short: "Precheck InfiniBand HCA status on all configured hosts",
+	Long: `Precheck and verify that all configured InfiniBand HCAs are in proper state.
+This command checks both physical state (LinkUp) and logical state (ACTIVE) 
+for each HCA on each host configured in the config file.
+
+Only HCAs that are both LinkUp and ACTIVE are considered healthy.
+
+Example:
+  xnetperf precheck`,
+	Run: runPrecheck,
+}
+
+func init() {
+	rootCmd.AddCommand(precheckCmd)
+}
+
+func runPrecheck(cmd *cobra.Command, args []string) {
+	cfg, err := config.LoadConfig(cfgFile)
+	if err != nil {
+		fmt.Printf("Error reading config: %v\n", err)
+		return
+	}
+
+	success := execPrecheckCommand(cfg)
+	if !success {
+		fmt.Println("\n❌ Precheck failed! Some HCAs are not in healthy state.")
+		fmt.Println("Please fix the network issues before running performance tests.")
+	} else {
+		fmt.Println("\n✅ Precheck passed! All HCAs are healthy.")
+	}
+}
+
+func execPrecheckCommand(cfg *config.Config) bool {
+	fmt.Println("Starting InfiniBand HCA precheck...")
+	fmt.Println()
+
+	// 收集所有需要检查的主机和HCA
+	var checkItems []struct {
+		hostname string
+		hca      string
+	}
+
+	// 添加服务器端的HCA
+	for _, hostname := range cfg.Server.Hostname {
+		for _, hca := range cfg.Server.Hca {
+			checkItems = append(checkItems, struct {
+				hostname string
+				hca      string
+			}{hostname, hca})
+		}
+	}
+
+	// 添加客户端的HCA
+	for _, hostname := range cfg.Client.Hostname {
+		for _, hca := range cfg.Client.Hca {
+			checkItems = append(checkItems, struct {
+				hostname string
+				hca      string
+			}{hostname, hca})
+		}
+	}
+
+	if len(checkItems) == 0 {
+		fmt.Println("No HCAs configured in config file")
+		return false
+	}
+
+	fmt.Printf("Checking %d HCAs across all hosts...\n\n", len(checkItems))
+
+	// 并发执行检查
+	results := precheckAllHCAs(checkItems)
+
+	// 显示结果
+	displayPrecheckResults(results)
+
+	// 检查是否所有HCA都健康
+	allHealthy := true
+	for _, result := range results {
+		if !result.IsHealthy {
+			allHealthy = false
+			break
+		}
+	}
+
+	return allHealthy
+}
+
+func precheckAllHCAs(checkItems []struct {
+	hostname string
+	hca      string
+}) []PrecheckResult {
+	var results []PrecheckResult
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, item := range checkItems {
+		wg.Add(1)
+		go func(hostname, hca string) {
+			defer wg.Done()
+			result := precheckHCA(hostname, hca)
+
+			mu.Lock()
+			results = append(results, result)
+			mu.Unlock()
+		}(item.hostname, item.hca)
+	}
+
+	wg.Wait()
+	return results
+}
+
+func precheckHCA(hostname, hca string) PrecheckResult {
+	result := PrecheckResult{
+		Hostname: hostname,
+		HCA:      hca,
+	}
+
+	// 检查物理状态
+	physStateCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/ports/1/phys_state", hca)
+	cmd := exec.Command("ssh", hostname, physStateCmd)
+	physOutput, err := cmd.CombinedOutput()
+
+	if err != nil {
+		result.Error = fmt.Sprintf("Failed to check phys_state: %v", err)
+		return result
+	}
+
+	// 检查逻辑状态
+	stateCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/ports/1/state", hca)
+	cmd = exec.Command("ssh", hostname, stateCmd)
+	stateOutput, err := cmd.CombinedOutput()
+
+	if err != nil {
+		result.Error = fmt.Sprintf("Failed to check state: %v", err)
+		return result
+	}
+
+	// 解析输出
+	physStateStr := strings.TrimSpace(string(physOutput))
+	stateStr := strings.TrimSpace(string(stateOutput))
+
+	// 去掉状态前面的数字和冒号，只保留有意义的文本
+	result.PhysState = cleanStateString(physStateStr)
+	result.State = cleanStateString(stateStr)
+
+	// 判断是否健康：需要同时满足 LinkUp 和 ACTIVE
+	isLinkUp := strings.Contains(physStateStr, "LinkUp")
+	isActive := strings.Contains(stateStr, "ACTIVE")
+
+	result.IsHealthy = isLinkUp && isActive
+
+	return result
+}
+
+// cleanStateString 去掉状态字符串前面的数字和冒号，只保留有意义的文本
+// 例如: "5: LinkUp" -> "LinkUp", "4: ACTIVE" -> "ACTIVE"
+func cleanStateString(stateStr string) string {
+	// 查找冒号的位置
+	colonIndex := strings.Index(stateStr, ":")
+	if colonIndex == -1 {
+		// 如果没有冒号，返回原字符串
+		return stateStr
+	}
+
+	// 返回冒号后面的内容，去掉前后空格
+	return strings.TrimSpace(stateStr[colonIndex+1:])
+}
+
+func displayPrecheckResults(results []PrecheckResult) {
+	fmt.Printf("=== Precheck Results (%s) ===\n", time.Now().Format("15:04:05"))
+
+	// 计算动态列宽
+	maxHostnameWidth := len("Hostname")
+	maxHCAWidth := len("HCA")
+	maxPhysStateWidth := len("Physical State")
+	maxStateWidth := len("Logical State")
+	maxStatusWidth := len("Status")
+
+	for _, result := range results {
+		if len(result.Hostname) > maxHostnameWidth {
+			maxHostnameWidth = len(result.Hostname)
+		}
+		if len(result.HCA) > maxHCAWidth {
+			maxHCAWidth = len(result.HCA)
+		}
+		if len(result.PhysState) > maxPhysStateWidth {
+			maxPhysStateWidth = len(result.PhysState)
+		}
+		if len(result.State) > maxStateWidth {
+			maxStateWidth = len(result.State)
+		}
+
+		// 计算状态文本长度，包含符号前缀
+		statusText := "[X] UNHEALTHY" // 默认最长的文本
+		if result.IsHealthy {
+			statusText = "[✓] HEALTHY"
+		} else if result.Error != "" {
+			statusText = "[!] ERROR"
+		}
+		if len(statusText) > maxStatusWidth {
+			maxStatusWidth = len(statusText)
+		}
+	}
+
+	// 确保最小宽度
+	if maxHostnameWidth < 12 {
+		maxHostnameWidth = 12
+	}
+	if maxHCAWidth < 8 {
+		maxHCAWidth = 8
+	}
+	if maxPhysStateWidth < 12 {
+		maxPhysStateWidth = 12
+	}
+	if maxStateWidth < 12 {
+		maxStateWidth = 12
+	}
+	if maxStatusWidth < 10 {
+		maxStatusWidth = 10
+	}
+
+	// 生成表格格式
+	headerFormat := fmt.Sprintf("│ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │\n",
+		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxStatusWidth)
+	separatorFormat := fmt.Sprintf("├─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┤\n",
+		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxStatusWidth)
+
+	// 生成边框
+	topBorder := fmt.Sprintf("┌─%s─┬─%s─┬─%s─┬─%s─┬─%s─┐\n",
+		strings.Repeat("─", maxHostnameWidth),
+		strings.Repeat("─", maxHCAWidth),
+		strings.Repeat("─", maxPhysStateWidth),
+		strings.Repeat("─", maxStateWidth),
+		strings.Repeat("─", maxStatusWidth))
+	bottomBorder := fmt.Sprintf("└─%s─┴─%s─┴─%s─┴─%s─┴─%s─┘\n",
+		strings.Repeat("─", maxHostnameWidth),
+		strings.Repeat("─", maxHCAWidth),
+		strings.Repeat("─", maxPhysStateWidth),
+		strings.Repeat("─", maxStateWidth),
+		strings.Repeat("─", maxStatusWidth))
+
+	// 打印表格
+	fmt.Print(topBorder)
+	fmt.Printf(headerFormat, "Hostname", "HCA", "Physical State", "Logical State", "Status")
+	fmt.Printf(separatorFormat,
+		strings.Repeat("─", maxHostnameWidth),
+		strings.Repeat("─", maxHCAWidth),
+		strings.Repeat("─", maxPhysStateWidth),
+		strings.Repeat("─", maxStateWidth),
+		strings.Repeat("─", maxStatusWidth))
+
+	// 重新生成 dataFormat，因为我们需要使用它
+	dataFormat := fmt.Sprintf("│ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │\n",
+		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxStatusWidth)
+
+	// 打印数据行
+	for _, result := range results {
+		physState := result.PhysState
+		logicalState := result.State
+		status := "[X] UNHEALTHY"
+
+		if result.Error != "" {
+			// 简化错误显示，直接在状态列中显示
+			physState = "N/A"
+			logicalState = "N/A"
+			status = "[!] ERROR"
+		} else if result.IsHealthy {
+			status = "[✓] HEALTHY"
+		}
+
+		fmt.Printf(dataFormat, result.Hostname, result.HCA, physState, logicalState, status)
+	}
+
+	fmt.Print(bottomBorder)
+
+	// 显示统计信息
+	healthy := 0
+	unhealthy := 0
+	errors := 0
+
+	for _, result := range results {
+		if result.Error != "" {
+			errors++
+		} else if result.IsHealthy {
+			healthy++
+		} else {
+			unhealthy++
+		}
+	}
+
+	fmt.Printf("Summary: %d healthy, %d unhealthy, %d errors (Total: %d HCAs)\n",
+		healthy, unhealthy, errors, len(results))
+}
