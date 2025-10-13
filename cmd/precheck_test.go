@@ -408,3 +408,58 @@ func TestSpeedConsistencyCheck(t *testing.T) {
 		t.Error("Expected failure when speeds are different")
 	}
 }
+
+// TestDisplayPrecheckResultsV004 测试 v0.0.4 的新功能：排序、合并和着色
+func TestDisplayPrecheckResultsV004(t *testing.T) {
+	// 准备测试数据，故意不按顺序排列以测试排序功能
+	results := []PrecheckResult{
+		{
+			Hostname:  "server-002", // 故意放在前面测试排序
+			HCA:       "mlx5_1",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2025",    // 少数版本，应该标黄色
+			BoardId:   "MT_0000000845", // 少数板卡ID，应该标黄色
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "server-001", // 测试排序
+			HCA:       "mlx5_1",     // 在 mlx5_0 后面，测试 HCA 排序
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",    // 多数版本，不着色
+			BoardId:   "MT_0000000844", // 多数板卡ID，不着色
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "server-001", // 相同 hostname，应该合并显示
+			HCA:       "mlx5_0",     // 在 mlx5_1 前面，测试 HCA 排序
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",    // 多数版本，不着色
+			BoardId:   "MT_0000000844", // 多数板卡ID，不着色
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "server-002", // 相同 hostname，应该合并显示
+			HCA:       "mlx5_0",     // 在 mlx5_1 前面，测试 HCA 排序
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
+			FwVer:     "28.43.2026",    // 多数版本，不着色
+			BoardId:   "MT_0000000844", // 多数板卡ID，不着色
+			IsHealthy: true,
+			Error:     "",
+		},
+	}
+
+	// 测试显示函数
+	t.Log("Testing displayPrecheckResults with v0.0.4 features (sorting, merging, coloring):")
+	displayPrecheckResults(results)
+}

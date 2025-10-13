@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -288,6 +289,14 @@ func removeAnsiCodes(str string) string {
 func displayPrecheckResults(results []PrecheckResult) {
 	fmt.Printf("=== Precheck Results (%s) ===\n", time.Now().Format("15:04:05"))
 
+	// v0.0.4: 按照 hostname 然后按 HCA 排序
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].Hostname != results[j].Hostname {
+			return results[i].Hostname < results[j].Hostname
+		}
+		return results[i].HCA < results[j].HCA
+	})
+
 	// 统计 Speed 值的出现次数，用于着色
 	speedCounts := make(map[string]int)
 	for _, result := range results {
@@ -297,10 +306,42 @@ func displayPrecheckResults(results []PrecheckResult) {
 	}
 
 	// 找出最常见的速度值（用于绿色显示）
-	maxCount := 0
+	maxSpeedCount := 0
 	for _, count := range speedCounts {
-		if count > maxCount {
-			maxCount = count
+		if count > maxSpeedCount {
+			maxSpeedCount = count
+		}
+	}
+
+	// v0.0.4: 统计 FW Version 值的出现次数，用于着色
+	fwVerCounts := make(map[string]int)
+	for _, result := range results {
+		if result.Error == "" && result.FwVer != "" {
+			fwVerCounts[result.FwVer]++
+		}
+	}
+
+	// 找出最常见的 FW Version 值
+	maxFwVerCount := 0
+	for _, count := range fwVerCounts {
+		if count > maxFwVerCount {
+			maxFwVerCount = count
+		}
+	}
+
+	// v0.0.4: 统计 Board ID 值的出现次数，用于着色
+	boardIdCounts := make(map[string]int)
+	for _, result := range results {
+		if result.Error == "" && result.BoardId != "" {
+			boardIdCounts[result.BoardId]++
+		}
+	}
+
+	// 找出最常见的 Board ID 值
+	maxBoardIdCount := 0
+	for _, count := range boardIdCounts {
+		if count > maxBoardIdCount {
+			maxBoardIdCount = count
 		}
 	}
 
@@ -340,11 +381,11 @@ func displayPrecheckResults(results []PrecheckResult) {
 		// 计算状态文本长度，包含符号前缀（不含颜色代码）
 		var statusText string
 		if result.Error != "" {
-			statusText = "[!] ERROR"
+			statusText = "[!] ERROR    " // 9+4=13字符
 		} else if result.IsHealthy {
-			statusText = "[✓] HEALTHY"
+			statusText = "[+] HEALTHY  " // 11+2=13字符
 		} else {
-			statusText = "[X] UNHEALTHY"
+			statusText = "[X] UNHEALTHY" // 13字符
 		}
 		if len(statusText) > maxStatusWidth {
 			maxStatusWidth = len(statusText)
@@ -416,7 +457,8 @@ func displayPrecheckResults(results []PrecheckResult) {
 		strings.Repeat("─", maxBoardIdWidth),
 		strings.Repeat("─", maxStatusWidth))
 
-	// 打印数据行
+	// 打印数据行 - v0.0.4: 实现 hostname 合并
+	var lastHostname string
 	for _, result := range results {
 		physState := result.PhysState
 		logicalState := result.State
@@ -433,9 +475,9 @@ func displayPrecheckResults(results []PrecheckResult) {
 			speed = "N/A"
 			fwVer = "N/A"
 			boardId = "N/A"
-			coloredStatus = ColorYellow + "[!] ERROR" + ColorReset
+			coloredStatus = ColorYellow + "[!] ERROR    " + ColorReset
 		} else if result.IsHealthy {
-			coloredStatus = ColorGreen + "[✓] HEALTHY  " + ColorReset
+			coloredStatus = ColorGreen + "[+] HEALTHY  " + ColorReset
 		} else {
 			coloredStatus = ColorRed + "[X] UNHEALTHY" + ColorReset
 		}
@@ -444,9 +486,9 @@ func displayPrecheckResults(results []PrecheckResult) {
 		var coloredSpeed string
 		if result.Error == "" && speed != "" {
 			speedCount := speedCounts[speed]
-			if speedCount == maxCount && maxCount > 1 { // 数量最多的标绿色
+			if speedCount == maxSpeedCount && maxSpeedCount > 1 { // 数量最多的标绿色
 				coloredSpeed = ColorGreen + speed + ColorReset
-			} else if speedCount < maxCount { // 数量少的标红色
+			} else if speedCount < maxSpeedCount { // 数量少的标红色
 				coloredSpeed = ColorRed + speed + ColorReset
 			} else {
 				coloredSpeed = speed // 相同数量或只有一个不着色
@@ -455,15 +497,49 @@ func displayPrecheckResults(results []PrecheckResult) {
 			coloredSpeed = speed
 		}
 
+		// v0.0.4: 根据 FW Version 着色
+		var coloredFwVer string
+		if result.Error == "" && fwVer != "" {
+			fwVerCount := fwVerCounts[fwVer]
+			if fwVerCount < maxFwVerCount { // 数量少的标黄色
+				coloredFwVer = ColorYellow + fwVer + ColorReset
+			} else {
+				coloredFwVer = fwVer // 数量多的不着色
+			}
+		} else {
+			coloredFwVer = fwVer
+		}
+
+		// v0.0.4: 根据 Board ID 着色
+		var coloredBoardId string
+		if result.Error == "" && boardId != "" {
+			boardIdCount := boardIdCounts[boardId]
+			if boardIdCount < maxBoardIdCount { // 数量少的标黄色
+				coloredBoardId = ColorYellow + boardId + ColorReset
+			} else {
+				coloredBoardId = boardId // 数量多的不着色
+			}
+		} else {
+			coloredBoardId = boardId
+		}
+
+		// v0.0.4: 实现 hostname 合并逻辑
+		displayHostname := result.Hostname
+		if result.Hostname == lastHostname {
+			displayHostname = "" // 相同的 hostname 显示为空，实现合并效果
+		} else {
+			lastHostname = result.Hostname
+		}
+
 		// 使用固定格式，不依赖颜色代码的长度
-		fmt.Printf("│ %-*s │ %-*s │ %-*s │ %-*s │ %s │ %-*s │ %-*s │ %s │\n",
-			maxHostnameWidth, result.Hostname,
+		fmt.Printf("│ %-*s │ %-*s │ %-*s │ %-*s │ %s │ %s │ %s │ %s │\n",
+			maxHostnameWidth, displayHostname,
 			maxHCAWidth, result.HCA,
 			maxPhysStateWidth, physState,
 			maxStateWidth, logicalState,
 			padStringWithColor(coloredSpeed, maxSpeedWidth),
-			maxFwVerWidth, fwVer,
-			maxBoardIdWidth, boardId,
+			padStringWithColor(coloredFwVer, maxFwVerWidth),
+			padStringWithColor(coloredBoardId, maxBoardIdWidth),
 			padStringWithColor(coloredStatus, maxStatusWidth))
 	}
 
