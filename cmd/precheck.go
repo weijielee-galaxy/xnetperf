@@ -459,7 +459,7 @@ func displayPrecheckResults(results []PrecheckResult) {
 
 	// 打印数据行 - v0.0.4: 实现 hostname 合并
 	var lastHostname string
-	for _, result := range results {
+	for i, result := range results {
 		physState := result.PhysState
 		logicalState := result.State
 		speed := result.Speed
@@ -523,11 +523,23 @@ func displayPrecheckResults(results []PrecheckResult) {
 			coloredBoardId = boardId
 		}
 
-		// v0.0.4: 实现 hostname 合并逻辑
+		// v0.0.4: 实现 hostname 合并逻辑和分隔线
 		displayHostname := result.Hostname
 		if result.Hostname == lastHostname {
 			displayHostname = "" // 相同的 hostname 显示为空，实现合并效果
 		} else {
+			// 在不同hostname之间添加分隔线（除了第一行）
+			if i > 0 {
+				fmt.Printf(separatorFormat,
+					strings.Repeat("─", maxHostnameWidth),
+					strings.Repeat("─", maxHCAWidth),
+					strings.Repeat("─", maxPhysStateWidth),
+					strings.Repeat("─", maxStateWidth),
+					strings.Repeat("─", maxSpeedWidth),
+					strings.Repeat("─", maxFwVerWidth),
+					strings.Repeat("─", maxBoardIdWidth),
+					strings.Repeat("─", maxStatusWidth))
+			}
 			lastHostname = result.Hostname
 		}
 
