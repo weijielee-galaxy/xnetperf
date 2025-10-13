@@ -435,7 +435,7 @@ func displayPrecheckResults(results []PrecheckResult) {
 			boardId = "N/A"
 			coloredStatus = ColorYellow + "[!] ERROR" + ColorReset
 		} else if result.IsHealthy {
-			coloredStatus = ColorGreen + "[✓] HEALTHY" + ColorReset
+			coloredStatus = ColorGreen + "[✓] HEALTHY  " + ColorReset
 		} else {
 			coloredStatus = ColorRed + "[X] UNHEALTHY" + ColorReset
 		}
