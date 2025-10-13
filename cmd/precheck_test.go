@@ -13,6 +13,7 @@ func TestDisplayPrecheckResults(t *testing.T) {
 			HCA:       "mlx5_0",
 			PhysState: "LinkUp",
 			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
 			IsHealthy: true,
 			Error:     "",
 		},
@@ -21,6 +22,7 @@ func TestDisplayPrecheckResults(t *testing.T) {
 			HCA:       "mlx5_1",
 			PhysState: "Polling",
 			State:     "INIT",
+			Speed:     "100 Gb/sec (1X HDR)",
 			IsHealthy: false,
 			Error:     "",
 		},
@@ -29,6 +31,7 @@ func TestDisplayPrecheckResults(t *testing.T) {
 			HCA:       "mlx5_0",
 			PhysState: "",
 			State:     "",
+			Speed:     "",
 			IsHealthy: false,
 			Error:     "SSH connection failed",
 		},
@@ -37,13 +40,14 @@ func TestDisplayPrecheckResults(t *testing.T) {
 			HCA:       "mlx5_2",
 			PhysState: "LinkUp",
 			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)",
 			IsHealthy: true,
 			Error:     "",
 		},
 	}
 
 	// 测试显示函数
-	t.Log("Testing displayPrecheckResults with various scenarios:")
+	t.Log("Testing displayPrecheckResults with various scenarios (no colors expected in test output):")
 	displayPrecheckResults(results)
 
 	// 验证结果统计
@@ -153,6 +157,52 @@ func TestPrecheckResultProcessing(t *testing.T) {
 	}
 }
 
+func TestDisplayPrecheckResultsWithColors(t *testing.T) {
+	// 准备测试数据，包含不同的速度值来测试颜色
+	results := []PrecheckResult{
+		{
+			Hostname:  "server-001",
+			HCA:       "mlx5_0",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)", // 这个速度出现2次，应该是绿色
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "server-002",
+			HCA:       "mlx5_1",
+			PhysState: "Polling",
+			State:     "INIT",
+			Speed:     "100 Gb/sec (1X HDR)", // 这个速度出现1次，应该是红色
+			IsHealthy: false,
+			Error:     "",
+		},
+		{
+			Hostname:  "server-003",
+			HCA:       "mlx5_2",
+			PhysState: "LinkUp",
+			State:     "ACTIVE",
+			Speed:     "200 Gb/sec (2X NDR)", // 这个速度出现2次，应该是绿色
+			IsHealthy: true,
+			Error:     "",
+		},
+		{
+			Hostname:  "client-001",
+			HCA:       "mlx5_0",
+			PhysState: "",
+			State:     "",
+			Speed:     "",
+			IsHealthy: false,
+			Error:     "SSH connection failed",
+		},
+	}
+
+	// 测试显示函数
+	t.Log("Testing displayPrecheckResults with color coding:")
+	displayPrecheckResults(results)
+}
+
 func TestCleanStateString(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -201,6 +251,44 @@ func TestCleanStateString(t *testing.T) {
 			result := cleanStateString(tc.input)
 			if result != tc.expected {
 				t.Errorf("cleanStateString(%q) = %q, expected %q", tc.input, result, tc.expected)
+			}
+		})
+	}
+}
+
+func TestRemoveAnsiCodes(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "String with green color code",
+			input:    "\033[32mHEALTHY\033[0m",
+			expected: "HEALTHY",
+		},
+		{
+			name:     "String with red color code",
+			input:    "\033[31mUNHEALTHY\033[0m",
+			expected: "UNHEALTHY",
+		},
+		{
+			name:     "String without color codes",
+			input:    "NORMAL TEXT",
+			expected: "NORMAL TEXT",
+		},
+		{
+			name:     "Empty string",
+			input:    "",
+			expected: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := removeAnsiCodes(tc.input)
+			if result != tc.expected {
+				t.Errorf("removeAnsiCodes(%q) = %q, expected %q", tc.input, result, tc.expected)
 			}
 		})
 	}

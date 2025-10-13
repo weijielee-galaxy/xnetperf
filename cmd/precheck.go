@@ -12,12 +12,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ANSI 颜色代码
+const (
+	ColorRed    = "\033[31m"
+	ColorGreen  = "\033[32m"
+	ColorYellow = "\033[33m"
+	ColorReset  = "\033[0m"
+)
+
 // PrecheckResult 表示预检查结果
 type PrecheckResult struct {
 	Hostname  string
 	HCA       string
 	PhysState string
 	State     string
+	Speed     string
 	IsHealthy bool
 	Error     string
 }
@@ -161,13 +170,25 @@ func precheckHCA(hostname, hca string) PrecheckResult {
 		return result
 	}
 
+	// 检查网卡速度
+	speedCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/ports/1/rate", hca)
+	cmd = exec.Command("ssh", hostname, speedCmd)
+	speedOutput, err := cmd.CombinedOutput()
+
+	if err != nil {
+		result.Error = fmt.Sprintf("Failed to check speed: %v", err)
+		return result
+	}
+
 	// 解析输出
 	physStateStr := strings.TrimSpace(string(physOutput))
 	stateStr := strings.TrimSpace(string(stateOutput))
+	speedStr := strings.TrimSpace(string(speedOutput))
 
 	// 去掉状态前面的数字和冒号，只保留有意义的文本
 	result.PhysState = cleanStateString(physStateStr)
 	result.State = cleanStateString(stateStr)
+	result.Speed = speedStr // 保持速度信息的原始格式
 
 	// 判断是否健康：需要同时满足 LinkUp 和 ACTIVE
 	isLinkUp := strings.Contains(physStateStr, "LinkUp")
@@ -192,14 +213,61 @@ func cleanStateString(stateStr string) string {
 	return strings.TrimSpace(stateStr[colonIndex+1:])
 }
 
+// padStringWithColor 处理带颜色代码的字符串，确保正确的填充宽度
+func padStringWithColor(str string, width int) string {
+	// 计算不包含ANSI颜色代码的实际显示宽度
+	visibleLen := len(removeAnsiCodes(str))
+	if visibleLen >= width {
+		return str
+	}
+	// 添加适当的空格填充
+	padding := strings.Repeat(" ", width-visibleLen)
+	return str + padding
+}
+
+// removeAnsiCodes 移除字符串中的ANSI颜色代码，用于计算实际显示宽度
+func removeAnsiCodes(str string) string {
+	// 简单的ANSI代码移除 - 移除 \033[...m 格式的代码
+	result := str
+	for {
+		start := strings.Index(result, "\033[")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(result[start:], "m")
+		if end == -1 {
+			break
+		}
+		result = result[:start] + result[start+end+1:]
+	}
+	return result
+}
+
 func displayPrecheckResults(results []PrecheckResult) {
 	fmt.Printf("=== Precheck Results (%s) ===\n", time.Now().Format("15:04:05"))
+
+	// 统计 Speed 值的出现次数，用于着色
+	speedCounts := make(map[string]int)
+	for _, result := range results {
+		if result.Error == "" && result.Speed != "" {
+			speedCounts[result.Speed]++
+		}
+	}
+
+	// 找出最常见的速度值（用于绿色显示）
+	maxCount := 0
+	for _, count := range speedCounts {
+		if count > maxCount {
+			maxCount = count
+		}
+	}
 
 	// 计算动态列宽
 	maxHostnameWidth := len("Hostname")
 	maxHCAWidth := len("HCA")
 	maxPhysStateWidth := len("Physical State")
 	maxStateWidth := len("Logical State")
+	maxSpeedWidth := len("Speed")
 	maxStatusWidth := len("Status")
 
 	for _, result := range results {
@@ -215,13 +283,18 @@ func displayPrecheckResults(results []PrecheckResult) {
 		if len(result.State) > maxStateWidth {
 			maxStateWidth = len(result.State)
 		}
+		if len(result.Speed) > maxSpeedWidth {
+			maxSpeedWidth = len(result.Speed)
+		}
 
-		// 计算状态文本长度，包含符号前缀
-		statusText := "[X] UNHEALTHY" // 默认最长的文本
-		if result.IsHealthy {
-			statusText = "[✓] HEALTHY"
-		} else if result.Error != "" {
+		// 计算状态文本长度，包含符号前缀（不含颜色代码）
+		var statusText string
+		if result.Error != "" {
 			statusText = "[!] ERROR"
+		} else if result.IsHealthy {
+			statusText = "[✓] HEALTHY"
+		} else {
+			statusText = "[X] UNHEALTHY"
 		}
 		if len(statusText) > maxStatusWidth {
 			maxStatusWidth = len(statusText)
@@ -241,60 +314,89 @@ func displayPrecheckResults(results []PrecheckResult) {
 	if maxStateWidth < 12 {
 		maxStateWidth = 12
 	}
+	if maxSpeedWidth < 15 {
+		maxSpeedWidth = 15
+	}
 	if maxStatusWidth < 10 {
 		maxStatusWidth = 10
 	}
 
-	// 生成表格格式
-	headerFormat := fmt.Sprintf("│ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │\n",
-		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxStatusWidth)
-	separatorFormat := fmt.Sprintf("├─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┤\n",
-		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxStatusWidth)
+	// 生成表格格式（6列：Hostname, HCA, Physical State, Logical State, Speed, Status）
+	headerFormat := fmt.Sprintf("│ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │\n",
+		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxSpeedWidth, maxStatusWidth)
+	separatorFormat := fmt.Sprintf("├─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┤\n",
+		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxSpeedWidth, maxStatusWidth)
 
 	// 生成边框
-	topBorder := fmt.Sprintf("┌─%s─┬─%s─┬─%s─┬─%s─┬─%s─┐\n",
+	topBorder := fmt.Sprintf("┌─%s─┬─%s─┬─%s─┬─%s─┬─%s─┬─%s─┐\n",
 		strings.Repeat("─", maxHostnameWidth),
 		strings.Repeat("─", maxHCAWidth),
 		strings.Repeat("─", maxPhysStateWidth),
 		strings.Repeat("─", maxStateWidth),
+		strings.Repeat("─", maxSpeedWidth),
 		strings.Repeat("─", maxStatusWidth))
-	bottomBorder := fmt.Sprintf("└─%s─┴─%s─┴─%s─┴─%s─┴─%s─┘\n",
+	bottomBorder := fmt.Sprintf("└─%s─┴─%s─┴─%s─┴─%s─┴─%s─┴─%s─┘\n",
 		strings.Repeat("─", maxHostnameWidth),
 		strings.Repeat("─", maxHCAWidth),
 		strings.Repeat("─", maxPhysStateWidth),
 		strings.Repeat("─", maxStateWidth),
+		strings.Repeat("─", maxSpeedWidth),
 		strings.Repeat("─", maxStatusWidth))
 
 	// 打印表格
 	fmt.Print(topBorder)
-	fmt.Printf(headerFormat, "Hostname", "HCA", "Physical State", "Logical State", "Status")
+	fmt.Printf(headerFormat, "Hostname", "HCA", "Physical State", "Logical State", "Speed", "Status")
 	fmt.Printf(separatorFormat,
 		strings.Repeat("─", maxHostnameWidth),
 		strings.Repeat("─", maxHCAWidth),
 		strings.Repeat("─", maxPhysStateWidth),
 		strings.Repeat("─", maxStateWidth),
+		strings.Repeat("─", maxSpeedWidth),
 		strings.Repeat("─", maxStatusWidth))
-
-	// 重新生成 dataFormat，因为我们需要使用它
-	dataFormat := fmt.Sprintf("│ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │\n",
-		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxStatusWidth)
 
 	// 打印数据行
 	for _, result := range results {
 		physState := result.PhysState
 		logicalState := result.State
-		status := "[X] UNHEALTHY"
+		speed := result.Speed
 
+		// 根据状态着色
+		var coloredStatus string
 		if result.Error != "" {
 			// 简化错误显示，直接在状态列中显示
 			physState = "N/A"
 			logicalState = "N/A"
-			status = "[!] ERROR"
+			speed = "N/A"
+			coloredStatus = ColorYellow + "[!] ERROR" + ColorReset
 		} else if result.IsHealthy {
-			status = "[✓] HEALTHY"
+			coloredStatus = ColorGreen + "[✓] HEALTHY  " + ColorReset
+		} else {
+			coloredStatus = ColorRed + "[X] UNHEALTHY" + ColorReset
 		}
 
-		fmt.Printf(dataFormat, result.Hostname, result.HCA, physState, logicalState, status)
+		// 根据速度着色
+		var coloredSpeed string
+		if result.Error == "" && speed != "" {
+			speedCount := speedCounts[speed]
+			if speedCount == maxCount && maxCount > 1 { // 数量最多的标绿色
+				coloredSpeed = ColorGreen + speed + ColorReset
+			} else if speedCount < maxCount { // 数量少的标红色
+				coloredSpeed = ColorRed + speed + ColorReset
+			} else {
+				coloredSpeed = speed // 相同数量或只有一个不着色
+			}
+		} else {
+			coloredSpeed = speed
+		}
+
+		// 使用固定格式，不依赖颜色代码的长度
+		fmt.Printf("│ %-*s │ %-*s │ %-*s │ %-*s │ %s │ %s │\n",
+			maxHostnameWidth, result.Hostname,
+			maxHCAWidth, result.HCA,
+			maxPhysStateWidth, physState,
+			maxStateWidth, logicalState,
+			padStringWithColor(coloredSpeed, maxSpeedWidth),
+			padStringWithColor(coloredStatus, maxStatusWidth))
 	}
 
 	fmt.Print(bottomBorder)
