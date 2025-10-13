@@ -83,6 +83,18 @@ func cleanupLocalFiles(reportsDir string, hosts map[string]bool) {
 func execCollectCommand(cfg *config.Config) error {
 	// 创建本地reports目录
 	reportsDir := "reports"
+
+	// Remove existing reports directory if it exists
+	if _, err := os.Stat(reportsDir); err == nil {
+		err = os.RemoveAll(reportsDir)
+		if err != nil {
+			fmt.Printf("Error removing existing reports directory: %v\n", err)
+			return err
+		}
+		fmt.Printf("Removed existing reports directory\n")
+	}
+
+	// Create new reports directory
 	err := os.MkdirAll(reportsDir, 0755)
 	if err != nil {
 		fmt.Printf("Error creating reports directory: %v\n", err)
