@@ -1,0 +1,44 @@
+# 网络接口映射配置示例
+# 这个配置文件展示了如何为不同的HCA设备指定对应的网络接口
+
+start_port: 20000
+stream_type: "incast" # "fullmesh" or "incast" or "p2p"
+qp_num: 10
+message_size_bytes: 4096
+output_base: "./generated_scripts"
+waiting_time_seconds: 15
+speed: 400 # in Gbps
+rdma_cm: true
+
+report:
+  enable: true
+  dir: "/root"
+
+run:
+  infinitely: true
+  duration_seconds: 10
+
+server:
+  hostname:
+  - "cetus-g88-094"
+  - "cetus-g88-065"
+  hca:
+  - "mlx5_0"
+  - "mlx5_1"
+  # 网络接口映射：HCA设备 -> 网络接口
+  # 如果没有指定，系统会自动尝试 bond0, eth0, ib0 等常见接口
+  network:
+    mlx5_0: "bond0"    # mlx5_0 HCA 使用 bond0 网络接口
+    mlx5_1: "eth1"     # mlx5_1 HCA 使用 eth1 网络接口
+
+client:
+  hostname:
+  - "cetus-g88-061"
+  - "cetus-g88-062"
+  hca:
+  - "mlx5_0"
+  - "mlx5_1"
+  # 客户端也可以有自己的网络接口映射
+  network:
+    mlx5_0: "bond0"
+    mlx5_1: "eth1"
