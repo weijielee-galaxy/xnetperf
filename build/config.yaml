@@ -1,6 +1,6 @@
 start_port: 20000
 stream_type: "p2p" # "fullmesh" or "incast" or "p2p"
-qp_num : 10
+qp_num: 10
 message_size_bytes: 4096
 output_base: "./generated_scripts"
 waiting_time_seconds: 15 # Time to wait before starting client scripts

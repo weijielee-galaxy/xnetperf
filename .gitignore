@@ -3,3 +3,4 @@
 .github
 area*.md
 build/reports
+build/configs

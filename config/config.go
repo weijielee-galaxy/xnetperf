@@ -16,7 +16,6 @@ const (
 // Config holds the entire configuration from the YAML file.
 type Config struct {
 	StartPort          int          `yaml:"start_port"`
-	DurationSeconds    int          `yaml:"duration_seconds"`
 	StreamType         string       `yaml:"stream_type"`
 	QpNum              int          `yaml:"qp_num"`
 	MessageSizeBytes   int          `yaml:"message_size_bytes"`
@@ -79,4 +78,67 @@ func LoadConfig(filePath string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse YAML content from '%s': %w", filePath, err)
 	}
 	return &cfg, nil
+}
+
+// NewDefaultConfig creates a new config with default values
+func NewDefaultConfig() *Config {
+	return &Config{
+		StartPort:          20000,
+		StreamType:         InCast,
+		QpNum:              10,
+		MessageSizeBytes:   4096,
+		OutputBase:         "./generated_scripts",
+		WaitingTimeSeconds: 15,
+		Speed:              400,
+		RdmaCm:             false,
+		Report: Report{
+			Enable: true,
+			Dir:    "/root",
+		},
+		Run: Run{
+			Infinitely:      false,
+			DurationSeconds: 10,
+		},
+		Server: ServerConfig{
+			Hostname: []string{},
+			Hca:      []string{},
+		},
+		Client: ClientConfig{
+			Hostname: []string{},
+			Hca:      []string{},
+		},
+	}
+}
+
+// ApplyDefaults applies default values to missing fields in the config
+func (c *Config) ApplyDefaults() {
+	if c.StartPort == 0 {
+		c.StartPort = 20000
+	}
+	if c.StreamType == "" {
+		c.StreamType = InCast
+	}
+	if c.QpNum == 0 {
+		c.QpNum = 10
+	}
+	if c.MessageSizeBytes == 0 {
+		c.MessageSizeBytes = 4096
+	}
+	if c.OutputBase == "" {
+		c.OutputBase = "./generated_scripts"
+	}
+	if c.WaitingTimeSeconds == 0 {
+		c.WaitingTimeSeconds = 15
+	}
+	if c.Speed == 0 {
+		c.Speed = 400
+	}
+	// Report defaults
+	if c.Report.Dir == "" {
+		c.Report.Dir = "/root"
+	}
+	// Run defaults
+	if c.Run.DurationSeconds == 0 {
+		c.Run.DurationSeconds = 10
+	}
 }
