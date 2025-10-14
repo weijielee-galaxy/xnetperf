@@ -1,0 +1,572 @@
+import { useState } from 'react'
+import {
+  Box,
+  VStack,
+  HStack,
+  Select,
+  Button,
+  Text,
+  useToast,
+  Card,
+  CardBody,
+  Heading,
+  Divider,
+  Badge,
+  Progress,
+  Alert,
+  AlertIcon,
+  AlertTitle,
+  AlertDescription,
+  Spinner,
+} from '@chakra-ui/react'
+import { CheckCircleIcon, WarningIcon, TimeIcon } from '@chakra-ui/icons'
+import ProbeResults from '../components/ProbeResults'
+import ReportResults from '../components/ReportResults'
+import {
+  runPrecheck,
+  runTest,
+  probeTest,
+  collectReports,
+  getReport,
+} from '../api'
+
+const STEPS = {
+  IDLE: 'idle',
+  PRECHECK: 'precheck',
+  RUN: 'run',
+  PROBE: 'probe',
+  COLLECT: 'collect',
+  REPORT: 'report',
+  COMPLETED: 'completed',
+  ERROR: 'error',
+}
+
+const STEP_LABELS = {
+  [STEPS.IDLE]: '待执行',
+  [STEPS.PRECHECK]: 'PreCheck 检查',
+  [STEPS.RUN]: '运行测试',
+  [STEPS.PROBE]: '探测状态',
+  [STEPS.COLLECT]: '收集报告',
+  [STEPS.REPORT]: '生成报告',
+  [STEPS.COMPLETED]: '完成',
+  [STEPS.ERROR]: '错误',
+}
+
+function TrafficTestPage({ configs }) {
+  const [selectedConfig, setSelectedConfig] = useState('')
+  const [currentStep, setCurrentStep] = useState(STEPS.IDLE)
+  const [stepStatus, setStepStatus] = useState({})
+  const [precheckData, setPrecheckData] = useState(null)
+  const [probeData, setProbeData] = useState(null)
+  const [reportData, setReportData] = useState(null)
+  const [errorMessage, setErrorMessage] = useState('')
+  const [isRunning, setIsRunning] = useState(false)
+  const toast = useToast()
+
+  // 重置所有状态
+  const resetStates = () => {
+    setCurrentStep(STEPS.IDLE)
+    setStepStatus({})
+    setPrecheckData(null)
+    setProbeData(null)
+    setReportData(null)
+    setErrorMessage('')
+    setIsRunning(false)
+  }
+
+  // 更新步骤状态
+  const updateStepStatus = (step, status, message = '') => {
+    setStepStatus(prev => ({
+      ...prev,
+      [step]: { status, message },
+    }))
+  }
+
+  // 步骤 1: PreCheck
+  const executePrecheckStep = async () => {
+    try {
+      setCurrentStep(STEPS.PRECHECK)
+      updateStepStatus(STEPS.PRECHECK, 'running', '正在执行 PreCheck...')
+
+      const data = await runPrecheck(selectedConfig)
+      setPrecheckData(data)
+
+      // 检查是否有失败项
+      // API 返回的数据结构: { check_passed, error_count, unhealthy_count, ... }
+      const hasError = !data.check_passed || data.error_count > 0 || data.unhealthy_count > 0
+
+      if (hasError) {
+        updateStepStatus(STEPS.PRECHECK, 'warning', 'PreCheck 发现警告或错误')
+        toast({
+          title: 'PreCheck 完成',
+          description: '发现一些警告或错误，请检查结果',
+          status: 'warning',
+          duration: 3000,
+        })
+        return false
+      }
+
+      updateStepStatus(STEPS.PRECHECK, 'success', 'PreCheck 通过')
+      return true
+    } catch (error) {
+      updateStepStatus(STEPS.PRECHECK, 'error', error.message)
+      setErrorMessage(`PreCheck 失败: ${error.message}`)
+      setCurrentStep(STEPS.ERROR)
+      toast({
+        title: 'PreCheck 失败',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+      })
+      return false
+    }
+  }
+
+  // 步骤 2: Run Test
+  const executeRunStep = async () => {
+    try {
+      setCurrentStep(STEPS.RUN)
+      updateStepStatus(STEPS.RUN, 'running', '正在分发和运行测试脚本...')
+
+      const result = await runTest(selectedConfig)
+
+      if (!result.success) {
+        updateStepStatus(STEPS.RUN, 'error', result.error || '测试运行失败')
+        setErrorMessage(`测试运行失败: ${result.error}`)
+        setCurrentStep(STEPS.ERROR)
+        toast({
+          title: '测试运行失败',
+          description: result.error,
+          status: 'error',
+          duration: 5000,
+        })
+        return false
+      }
+
+      updateStepStatus(STEPS.RUN, 'success', result.message)
+      return true
+    } catch (error) {
+      updateStepStatus(STEPS.RUN, 'error', error.message)
+      setErrorMessage(`测试运行失败: ${error.message}`)
+      setCurrentStep(STEPS.ERROR)
+      toast({
+        title: '测试运行失败',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+      })
+      return false
+    }
+  }
+
+  // 步骤 3: Probe (轮询直到所有进程完成)
+  const executeProbeStep = async () => {
+    try {
+      setCurrentStep(STEPS.PROBE)
+      updateStepStatus(STEPS.PROBE, 'running', '正在探测测试进程状态...')
+
+      let allCompleted = false
+      let probeCount = 0
+      const maxProbes = 300 // 最多探测 5 分钟 (300 * 2秒)
+
+      while (!allCompleted && probeCount < maxProbes) {
+        const data = await probeTest(selectedConfig)
+        setProbeData(data)
+
+        allCompleted = data.all_completed
+
+        if (!allCompleted) {
+          updateStepStatus(
+            STEPS.PROBE,
+            'running',
+            `探测中... (运行: ${data.running_hosts}, 完成: ${data.completed_hosts}, 错误: ${data.error_hosts})`
+          )
+          // 等待 2 秒后继续探测
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          probeCount++
+        }
+      }
+
+      if (!allCompleted) {
+        updateStepStatus(STEPS.PROBE, 'warning', '探测超时，但继续执行后续步骤')
+        toast({
+          title: '探测超时',
+          description: '未能确认所有进程完成，但将继续执行',
+          status: 'warning',
+          duration: 5000,
+        })
+        return true // 仍然继续
+      }
+
+      if (probeData && probeData.error_hosts > 0) {
+        updateStepStatus(STEPS.PROBE, 'warning', '部分主机执行出错')
+        toast({
+          title: '部分主机出错',
+          description: `${probeData.error_hosts} 个主机执行时出错`,
+          status: 'warning',
+          duration: 3000,
+        })
+        return true // 仍然继续收集
+      }
+
+      updateStepStatus(STEPS.PROBE, 'success', '所有测试进程已完成')
+      return true
+    } catch (error) {
+      updateStepStatus(STEPS.PROBE, 'error', error.message)
+      setErrorMessage(`探测失败: ${error.message}`)
+      setCurrentStep(STEPS.ERROR)
+      toast({
+        title: '探测失败',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+      })
+      return false
+    }
+  }
+
+  // 步骤 4: Collect Reports
+  const executeCollectStep = async () => {
+    try {
+      setCurrentStep(STEPS.COLLECT)
+      updateStepStatus(STEPS.COLLECT, 'running', '正在收集测试报告...')
+
+      const result = await collectReports(selectedConfig)
+
+      if (!result.success) {
+        updateStepStatus(STEPS.COLLECT, 'error', result.error || '报告收集失败')
+        setErrorMessage(`报告收集失败: ${result.error}`)
+        setCurrentStep(STEPS.ERROR)
+        toast({
+          title: '报告收集失败',
+          description: result.error,
+          status: 'error',
+          duration: 5000,
+        })
+        return false
+      }
+
+      const totalFiles = Object.values(result.collected_files).reduce(
+        (sum, count) => sum + count,
+        0
+      )
+      updateStepStatus(
+        STEPS.COLLECT,
+        'success',
+        `已收集 ${totalFiles} 个报告文件`
+      )
+      return true
+    } catch (error) {
+      updateStepStatus(STEPS.COLLECT, 'error', error.message)
+      setErrorMessage(`报告收集失败: ${error.message}`)
+      setCurrentStep(STEPS.ERROR)
+      toast({
+        title: '报告收集失败',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+      })
+      return false
+    }
+  }
+
+  // 步骤 5: Generate Report
+  const executeReportStep = async () => {
+    try {
+      setCurrentStep(STEPS.REPORT)
+      updateStepStatus(STEPS.REPORT, 'running', '正在生成性能报告...')
+
+      const data = await getReport(selectedConfig)
+      setReportData(data)
+
+      updateStepStatus(STEPS.REPORT, 'success', '报告生成完成')
+      setCurrentStep(STEPS.COMPLETED)
+      toast({
+        title: '流量测试完成',
+        description: '所有步骤已成功执行',
+        status: 'success',
+        duration: 5000,
+      })
+      return true
+    } catch (error) {
+      updateStepStatus(STEPS.REPORT, 'error', error.message)
+      setErrorMessage(`报告生成失败: ${error.message}`)
+      setCurrentStep(STEPS.ERROR)
+      toast({
+        title: '报告生成失败',
+        description: error.message,
+        status: 'error',
+        duration: 5000,
+      })
+      return false
+    }
+  }
+
+  // 执行完整工作流
+  const executeWorkflow = async () => {
+    if (!selectedConfig) {
+      toast({
+        title: '请选择配置文件',
+        status: 'warning',
+        duration: 3000,
+      })
+      return
+    }
+
+    resetStates()
+    setIsRunning(true)
+
+    try {
+      // 步骤 1: PreCheck
+      if (!(await executePrecheckStep())) {
+        setIsRunning(false)
+        return
+      }
+
+      // 步骤 2: Run
+      if (!(await executeRunStep())) {
+        setIsRunning(false)
+        return
+      }
+
+      // 步骤 3: Probe
+      if (!(await executeProbeStep())) {
+        setIsRunning(false)
+        return
+      }
+
+      // 步骤 4: Collect
+      if (!(await executeCollectStep())) {
+        setIsRunning(false)
+        return
+      }
+
+      // 步骤 5: Report
+      await executeReportStep()
+    } finally {
+      setIsRunning(false)
+    }
+  }
+
+  // 渲染步骤状态图标
+  const renderStepIcon = step => {
+    const status = stepStatus[step]?.status
+
+    if (!status) {
+      return <TimeIcon color="gray.400" />
+    }
+
+    switch (status) {
+      case 'running':
+        return <Spinner size="sm" color="blue.500" />
+      case 'success':
+        return <CheckCircleIcon color="green.500" />
+      case 'warning':
+        return <WarningIcon color="orange.500" />
+      case 'error':
+        return <WarningIcon color="red.500" />
+      default:
+        return <TimeIcon color="gray.400" />
+    }
+  }
+
+  // 渲染步骤状态徽章
+  const renderStepBadge = step => {
+    const status = stepStatus[step]?.status
+
+    if (!status) {
+      return <Badge colorScheme="gray">待执行</Badge>
+    }
+
+    switch (status) {
+      case 'running':
+        return <Badge colorScheme="blue">执行中</Badge>
+      case 'success':
+        return <Badge colorScheme="green">成功</Badge>
+      case 'warning':
+        return <Badge colorScheme="orange">警告</Badge>
+      case 'error':
+        return <Badge colorScheme="red">失败</Badge>
+      default:
+        return <Badge colorScheme="gray">待执行</Badge>
+    }
+  }
+
+  return (
+    <Box p={6} h="100%" overflowY="auto">
+      <VStack spacing={6} align="stretch">
+        {/* 配置选择区 */}
+        <Card>
+          <CardBody>
+            <VStack spacing={4} align="stretch">
+              <Heading size="md">流量测试</Heading>
+              <Divider />
+
+              <HStack>
+                <Text minW="100px">选择配置:</Text>
+                <Select
+                  placeholder="请选择配置文件"
+                  value={selectedConfig}
+                  onChange={e => {
+                    setSelectedConfig(e.target.value)
+                    resetStates()
+                  }}
+                  isDisabled={isRunning}
+                >
+                  {configs.map(cfg => (
+                    <option key={cfg.name} value={cfg.name}>
+                      {cfg.name}
+                    </option>
+                  ))}
+                </Select>
+
+                <Button
+                  colorScheme="blue"
+                  onClick={executeWorkflow}
+                  isLoading={isRunning}
+                  isDisabled={!selectedConfig || isRunning}
+                  minW="150px"
+                >
+                  开始测试
+                </Button>
+
+                <Button
+                  variant="outline"
+                  onClick={resetStates}
+                  isDisabled={isRunning}
+                >
+                  重置
+                </Button>
+              </HStack>
+            </VStack>
+          </CardBody>
+        </Card>
+
+        {/* 工作流步骤显示 */}
+        {currentStep !== STEPS.IDLE && (
+          <Card>
+            <CardBody>
+              <VStack spacing={4} align="stretch">
+                <Heading size="sm">执行步骤</Heading>
+                <Divider />
+
+                {/* 进度条 */}
+                <Box>
+                  <Progress
+                    value={
+                      currentStep === STEPS.PRECHECK
+                        ? 20
+                        : currentStep === STEPS.RUN
+                        ? 40
+                        : currentStep === STEPS.PROBE
+                        ? 60
+                        : currentStep === STEPS.COLLECT
+                        ? 80
+                        : currentStep === STEPS.REPORT
+                        ? 90
+                        : currentStep === STEPS.COMPLETED
+                        ? 100
+                        : 0
+                    }
+                    colorScheme={currentStep === STEPS.ERROR ? 'red' : 'blue'}
+                    hasStripe
+                    isAnimated={isRunning}
+                  />
+                </Box>
+
+                {/* 步骤列表 */}
+                <VStack spacing={3} align="stretch">
+                  {[
+                    STEPS.PRECHECK,
+                    STEPS.RUN,
+                    STEPS.PROBE,
+                    STEPS.COLLECT,
+                    STEPS.REPORT,
+                  ].map(step => (
+                    <HStack key={step} spacing={3}>
+                      <Box w="24px">{renderStepIcon(step)}</Box>
+                      <Text fontWeight="medium" minW="120px">
+                        {STEP_LABELS[step]}
+                      </Text>
+                      {renderStepBadge(step)}
+                      {stepStatus[step]?.message && (
+                        <Text fontSize="sm" color="gray.600">
+                          {stepStatus[step].message}
+                        </Text>
+                      )}
+                    </HStack>
+                  ))}
+                </VStack>
+              </VStack>
+            </CardBody>
+          </Card>
+        )}
+
+        {/* 错误提示 */}
+        {currentStep === STEPS.ERROR && errorMessage && (
+          <Alert status="error">
+            <AlertIcon />
+            <Box flex="1">
+              <AlertTitle>执行失败</AlertTitle>
+              <AlertDescription>{errorMessage}</AlertDescription>
+            </Box>
+          </Alert>
+        )}
+
+        {/* PreCheck 结果 */}
+        {precheckData && (
+          <Card>
+            <CardBody>
+              <VStack spacing={4} align="stretch">
+                <Heading size="sm">PreCheck 检查结果</Heading>
+                <Divider />
+                <Alert
+                  status={precheckData.check_passed ? 'success' : 'warning'}
+                  variant="subtle"
+                >
+                  <AlertIcon />
+                  <Box flex="1">
+                    <AlertTitle>
+                      {precheckData.check_passed ? '✅ Precheck 通过' : '⚠️ Precheck 发现问题'}
+                    </AlertTitle>
+                    <AlertDescription>
+                      健康: {precheckData.healthy_count}, 异常: {precheckData.unhealthy_count}, 错误: {precheckData.error_count}
+                    </AlertDescription>
+                  </Box>
+                </Alert>
+              </VStack>
+            </CardBody>
+          </Card>
+        )}
+
+        {/* Probe 结果 */}
+        {probeData && (
+          <Card>
+            <CardBody>
+              <VStack spacing={4} align="stretch">
+                <Heading size="sm">进程探测结果</Heading>
+                <Divider />
+                <ProbeResults data={probeData} />
+              </VStack>
+            </CardBody>
+          </Card>
+        )}
+
+        {/* Report 结果 */}
+        {reportData && (
+          <Card>
+            <CardBody>
+              <VStack spacing={4} align="stretch">
+                <Heading size="sm">性能测试报告</Heading>
+                <Divider />
+                <ReportResults data={reportData} />
+              </VStack>
+            </CardBody>
+          </Card>
+        )}
+      </VStack>
+    </Box>
+  )
+}
+
+export default TrafficTestPage

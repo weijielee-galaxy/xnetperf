@@ -129,3 +129,29 @@ export async function runPrecheck(name) {
     method: 'POST',
   })
 }
+
+// 运行测试
+export async function runTest(name) {
+  return await fetchJSON(`${API_BASE}/configs/${name}/run`, {
+    method: 'POST',
+  })
+}
+
+// 探测测试状态
+export async function probeTest(name) {
+  return await fetchJSON(`${API_BASE}/configs/${name}/probe`, {
+    method: 'POST',
+  })
+}
+
+// 收集报告
+export async function collectReports(name) {
+  return await fetchJSON(`${API_BASE}/configs/${name}/collect`, {
+    method: 'POST',
+  })
+}
+
+// 获取性能报告
+export async function getReport(name) {
+  return await fetchJSON(`${API_BASE}/configs/${name}/report`)
+}

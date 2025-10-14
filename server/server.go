@@ -48,6 +48,10 @@ func (s *Server) setupRoutes() {
 			configs.DELETE("/:name", s.configService.DeleteConfig)          // 删除配置文件
 			configs.POST("/:name/validate", s.configService.ValidateConfig) // 验证配置文件
 			configs.POST("/:name/precheck", s.configService.PrecheckConfig) // 执行 precheck 检查
+			configs.POST("/:name/run", s.configService.RunTest)             // 运行测试
+			configs.POST("/:name/probe", s.configService.ProbeTest)         // 探测测试状态
+			configs.POST("/:name/collect", s.configService.CollectReports)  // 收集报告
+			configs.GET("/:name/report", s.configService.GetReport)         // 获取性能报告
 		}
 
 		// 字典管理API

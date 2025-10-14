@@ -8,6 +8,7 @@ import (
 
 	"xnetperf/config"
 	"xnetperf/precheck"
+	"xnetperf/workflow"
 
 	"github.com/gin-gonic/gin"
 	"gopkg.in/yaml.v3"
@@ -409,4 +410,164 @@ func (s *ConfigService) PrecheckConfig(c *gin.Context) {
 
 	// 返回检查结果
 	c.JSON(200, Success(summary))
+}
+
+// RunTest 运行测试（不包含 precheck）
+func (s *ConfigService) RunTest(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(400, Error(400, "配置文件名不能为空"))
+		return
+	}
+
+	// 构建文件路径
+	var filePath string
+	if name == DefaultConfigFile {
+		filePath = DefaultConfigFile
+	} else {
+		filePath = filepath.Join(ConfigsDir, name)
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(404, Error(404, "配置文件不存在"))
+		return
+	}
+
+	// 加载配置文件
+	cfg, err := config.LoadConfig(filePath)
+	if err != nil {
+		c.JSON(400, Error(400, fmt.Sprintf("配置文件解析失败: %v", err)))
+		return
+	}
+
+	// 执行测试
+	result, err := workflow.ExecuteRun(cfg)
+	if err != nil {
+		c.JSON(500, Error(500, fmt.Sprintf("测试运行失败: %v", err)))
+		return
+	}
+
+	// 返回结果
+	c.JSON(200, Success(result))
+}
+
+// ProbeTest 探测测试状态
+func (s *ConfigService) ProbeTest(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(400, Error(400, "配置文件名不能为空"))
+		return
+	}
+
+	// 构建文件路径
+	var filePath string
+	if name == DefaultConfigFile {
+		filePath = DefaultConfigFile
+	} else {
+		filePath = filepath.Join(ConfigsDir, name)
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(404, Error(404, "配置文件不存在"))
+		return
+	}
+
+	// 加载配置文件
+	cfg, err := config.LoadConfig(filePath)
+	if err != nil {
+		c.JSON(400, Error(400, fmt.Sprintf("配置文件解析失败: %v", err)))
+		return
+	}
+
+	// 执行探测
+	summary, err := workflow.ExecuteProbe(cfg)
+	if err != nil {
+		c.JSON(500, Error(500, fmt.Sprintf("探测执行失败: %v", err)))
+		return
+	}
+
+	// 返回结果
+	c.JSON(200, Success(summary))
+}
+
+// CollectReports 收集测试报告
+func (s *ConfigService) CollectReports(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(400, Error(400, "配置文件名不能为空"))
+		return
+	}
+
+	// 构建文件路径
+	var filePath string
+	if name == DefaultConfigFile {
+		filePath = DefaultConfigFile
+	} else {
+		filePath = filepath.Join(ConfigsDir, name)
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(404, Error(404, "配置文件不存在"))
+		return
+	}
+
+	// 加载配置文件
+	cfg, err := config.LoadConfig(filePath)
+	if err != nil {
+		c.JSON(400, Error(400, fmt.Sprintf("配置文件解析失败: %v", err)))
+		return
+	}
+
+	// 执行收集
+	result, err := workflow.ExecuteCollect(cfg)
+	if err != nil {
+		c.JSON(500, Error(500, fmt.Sprintf("报告收集失败: %v", err)))
+		return
+	}
+
+	// 返回结果
+	c.JSON(200, Success(result))
+}
+
+// GetReport 获取性能报告
+func (s *ConfigService) GetReport(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(400, Error(400, "配置文件名不能为空"))
+		return
+	}
+
+	// 构建文件路径
+	var filePath string
+	if name == DefaultConfigFile {
+		filePath = DefaultConfigFile
+	} else {
+		filePath = filepath.Join(ConfigsDir, name)
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(404, Error(404, "配置文件不存在"))
+		return
+	}
+
+	// 加载配置文件
+	cfg, err := config.LoadConfig(filePath)
+	if err != nil {
+		c.JSON(400, Error(400, fmt.Sprintf("配置文件解析失败: %v", err)))
+		return
+	}
+
+	// 生成报告
+	report, err := workflow.GenerateReport(cfg)
+	if err != nil {
+		c.JSON(500, Error(500, fmt.Sprintf("报告生成失败: %v", err)))
+		return
+	}
+
+	// 返回结果
+	c.JSON(200, Success(report))
 }
