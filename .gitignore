@@ -4,3 +4,5 @@
 area*.md
 build/reports
 build/configs
+web/node_modules
+web/dist

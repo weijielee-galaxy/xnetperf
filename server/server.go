@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"io/fs"
-	"net/http"
 
 	"xnetperf/web"
 
@@ -33,18 +32,6 @@ func NewServer(port int) *Server {
 
 // setupRoutes 设置路由
 func (s *Server) setupRoutes() {
-	// 静态文件服务（Web UI）
-	staticFS, err := fs.Sub(web.Static, "static")
-	if err != nil {
-		panic(err)
-	}
-	s.engine.StaticFS("/ui", http.FS(staticFS))
-
-	// 根路径重定向到 Web UI
-	s.engine.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/ui/")
-	})
-
 	// API 分组
 	api := s.engine.Group("/api")
 	{
@@ -63,6 +50,47 @@ func (s *Server) setupRoutes() {
 	// 健康检查
 	s.engine.GET("/health", func(c *gin.Context) {
 		c.JSON(200, Success(gin.H{"status": "ok"}))
+	})
+
+	// 静态文件服务（Web UI）- 放在最后，作为 fallback
+	staticFS, err := fs.Sub(web.Static, "static")
+	if err != nil {
+		panic(err)
+	}
+	s.engine.NoRoute(func(c *gin.Context) {
+		path := c.Request.URL.Path
+		// 如果是根路径或目录，返回 index.html
+		if path == "/" || path == "" {
+			path = "index.html"
+		} else {
+			// 去掉开头的 /
+			path = path[1:]
+		}
+
+		// 尝试读取文件
+		data, err := fs.ReadFile(staticFS, path)
+		if err != nil {
+			// 如果文件不存在，返回 index.html（用于 SPA 路由）
+			data, err = fs.ReadFile(staticFS, "index.html")
+			if err != nil {
+				c.String(404, "Not Found")
+				return
+			}
+			c.Data(200, "text/html; charset=utf-8", data)
+			return
+		}
+
+		// 根据文件扩展名设置 Content-Type
+		contentType := "application/octet-stream"
+		if len(path) > 3 && path[len(path)-3:] == ".js" {
+			contentType = "application/javascript"
+		} else if len(path) > 5 && path[len(path)-5:] == ".html" {
+			contentType = "text/html; charset=utf-8"
+		} else if len(path) > 4 && path[len(path)-4:] == ".css" {
+			contentType = "text/css"
+		}
+
+		c.Data(200, contentType, data)
 	})
 }
 
