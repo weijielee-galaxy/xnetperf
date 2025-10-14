@@ -16,6 +16,7 @@ import {
   TagCloseButton,
   Wrap,
   WrapItem,
+  SimpleGrid,
   IconButton,
   useToast,
   Spinner,
@@ -138,33 +139,37 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
   return (
     <Box flex={1} display="flex" flexDirection="column">
       {/* Header */}
-      <HStack p={4} borderBottom="1px" borderColor="gray.200" justify="space-between" bg="white">
-        <Heading size="md">{currentConfig}</Heading>
+      <HStack p={4} borderBottom="1px" borderColor="gray.200" justify="space-between" bg="white" shadow="sm">
         <HStack spacing={2}>
-          <Button size="sm" onClick={handleValidate} isLoading={validating}>
-            ✓ 验证配置
+          <Text fontSize="lg" fontWeight="semibold" color="gray.700">📄</Text>
+          <Heading size="md" color="gray.700">{currentConfig}</Heading>
+        </HStack>
+        <HStack spacing={2}>
+          <Button size="sm" colorScheme="blue" variant="outline" onClick={handleValidate} isLoading={validating}>
+            验证
           </Button>
           <Button size="sm" variant="ghost" onClick={onCancel}>
-            ✕ 取消
+            取消
           </Button>
           <Button size="sm" colorScheme="green" onClick={handleSave} isLoading={saving}>
-            💾 保存
+            保存
           </Button>
         </HStack>
       </HStack>
 
       {/* Form */}
-      <Box flex={1} overflowY="auto" p={6}>
-        <VStack spacing={8} align="stretch">
+      <Box flex={1} overflowY="auto" p={6} bg="gray.50">
+        <VStack spacing={6} align="stretch">
           {/* 基础配置 */}
-          <Box>
-            <Heading size="sm" mb={4} pb={2} borderBottom="2px" borderColor="blue.500">
+          <Box bg="white" p={6} borderRadius="lg" shadow="sm">
+            <Heading size="md" mb={4} color="blue.600">
               基础配置
             </Heading>
-            <VStack spacing={4} align="stretch">
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
               <FormControl>
-                <FormLabel>起始端口 (start_port)</FormLabel>
+                <FormLabel fontSize="sm" fontWeight="medium">起始端口</FormLabel>
                 <NumberInput
+                  size="sm"
                   value={configData.start_port || 0}
                   min={1}
                   max={65535}
@@ -175,8 +180,9 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
               </FormControl>
 
               <FormControl>
-                <FormLabel>流类型 (stream_type)</FormLabel>
+                <FormLabel fontSize="sm" fontWeight="medium">流类型</FormLabel>
                 <Select
+                  size="sm"
                   value={configData.stream_type || ''}
                   onChange={(e) => updateField('stream_type', e.target.value)}
                 >
@@ -187,8 +193,9 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
               </FormControl>
 
               <FormControl>
-                <FormLabel>队列对数量 (qp_num)</FormLabel>
+                <FormLabel fontSize="sm" fontWeight="medium">队列对数量</FormLabel>
                 <NumberInput
+                  size="sm"
                   value={configData.qp_num || 0}
                   min={1}
                   onChange={(_, val) => updateField('qp_num', val)}
@@ -198,8 +205,9 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
               </FormControl>
 
               <FormControl>
-                <FormLabel>消息大小/字节 (message_size_bytes)</FormLabel>
+                <FormLabel fontSize="sm" fontWeight="medium">消息大小 (字节)</FormLabel>
                 <NumberInput
+                  size="sm"
                   value={configData.message_size_bytes || 0}
                   min={1}
                   onChange={(_, val) => updateField('message_size_bytes', val)}
@@ -209,16 +217,9 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
               </FormControl>
 
               <FormControl>
-                <FormLabel>输出目录 (output_base)</FormLabel>
-                <Input
-                  value={configData.output_base || ''}
-                  onChange={(e) => updateField('output_base', e.target.value)}
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>等待时间/秒 (waiting_time_seconds)</FormLabel>
+                <FormLabel fontSize="sm" fontWeight="medium">等待时间 (秒)</FormLabel>
                 <NumberInput
+                  size="sm"
                   value={configData.waiting_time_seconds || 0}
                   min={0}
                   onChange={(_, val) => updateField('waiting_time_seconds', val)}
@@ -228,8 +229,9 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
               </FormControl>
 
               <FormControl>
-                <FormLabel>速度/Gbps (speed)</FormLabel>
+                <FormLabel fontSize="sm" fontWeight="medium">速度 (Gbps)</FormLabel>
                 <NumberInput
+                  size="sm"
                   value={configData.speed || 0}
                   min={0}
                   onChange={(_, val) => updateField('speed', val)}
@@ -238,166 +240,194 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
                 </NumberInput>
               </FormControl>
 
-              <FormControl display="flex" alignItems="center">
-                <FormLabel mb={0}>使用 RDMA CM (rdma_cm)</FormLabel>
+              <FormControl gridColumn={{ md: "span 2" }}>
+                <FormLabel fontSize="sm" fontWeight="medium">输出目录</FormLabel>
+                <Input
+                  size="sm"
+                  value={configData.output_base || ''}
+                  onChange={(e) => updateField('output_base', e.target.value)}
+                />
+              </FormControl>
+
+              <FormControl display="flex" alignItems="center" pt={6}>
                 <Switch
                   isChecked={configData.rdma_cm || false}
                   onChange={(e) => updateField('rdma_cm', e.target.checked)}
+                  colorScheme="blue"
                 />
+                <FormLabel mb={0} ml={3} fontSize="sm">使用 RDMA CM</FormLabel>
               </FormControl>
-            </VStack>
+            </SimpleGrid>
           </Box>
 
-          {/* 报告配置 */}
-          <Box>
-            <Heading size="sm" mb={4} pb={2} borderBottom="2px" borderColor="blue.500">
-              报告配置 (report)
-            </Heading>
-            <VStack spacing={4} align="stretch">
-              <FormControl display="flex" alignItems="center">
-                <FormLabel mb={0}>启用报告 (enable)</FormLabel>
-                <Switch
-                  isChecked={configData.report?.enable || false}
-                  onChange={(e) => updateNestedField('report', 'enable', e.target.checked)}
-                />
-              </FormControl>
+          {/* 报告配置 & 运行配置 */}
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+            {/* 报告配置 */}
+            <Box bg="white" p={6} borderRadius="lg" shadow="sm">
+              <Heading size="md" mb={4} color="green.600">
+                报告配置
+              </Heading>
+              <VStack spacing={4} align="stretch">
+                <FormControl display="flex" alignItems="center">
+                  <Switch
+                    isChecked={configData.report?.enable || false}
+                    onChange={(e) => updateNestedField('report', 'enable', e.target.checked)}
+                    colorScheme="green"
+                  />
+                  <FormLabel mb={0} ml={3} fontSize="sm">启用报告</FormLabel>
+                </FormControl>
 
-              <FormControl>
-                <FormLabel>报告目录 (dir)</FormLabel>
-                <Input
-                  value={configData.report?.dir || ''}
-                  onChange={(e) => updateNestedField('report', 'dir', e.target.value)}
-                />
-              </FormControl>
-            </VStack>
-          </Box>
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="medium">报告目录</FormLabel>
+                  <Input
+                    size="sm"
+                    value={configData.report?.dir || ''}
+                    onChange={(e) => updateNestedField('report', 'dir', e.target.value)}
+                  />
+                </FormControl>
+              </VStack>
+            </Box>
 
-          {/* 运行配置 */}
-          <Box>
-            <Heading size="sm" mb={4} pb={2} borderBottom="2px" borderColor="blue.500">
-              运行配置 (run)
-            </Heading>
-            <VStack spacing={4} align="stretch">
-              <FormControl display="flex" alignItems="center">
-                <FormLabel mb={0}>无限运行 (infinitely)</FormLabel>
-                <Switch
-                  isChecked={configData.run?.infinitely || false}
-                  onChange={(e) => updateNestedField('run', 'infinitely', e.target.checked)}
-                />
-              </FormControl>
+            {/* 运行配置 */}
+            <Box bg="white" p={6} borderRadius="lg" shadow="sm">
+              <Heading size="md" mb={4} color="purple.600">
+                运行配置
+              </Heading>
+              <VStack spacing={4} align="stretch">
+                <FormControl display="flex" alignItems="center">
+                  <Switch
+                    isChecked={configData.run?.infinitely || false}
+                    onChange={(e) => updateNestedField('run', 'infinitely', e.target.checked)}
+                    colorScheme="purple"
+                  />
+                  <FormLabel mb={0} ml={3} fontSize="sm">无限运行</FormLabel>
+                </FormControl>
 
-              <FormControl>
-                <FormLabel>运行时长/秒 (duration_seconds)</FormLabel>
-                <NumberInput
-                  value={configData.run?.duration_seconds || 0}
-                  min={0}
-                  onChange={(_, val) => updateNestedField('run', 'duration_seconds', val)}
-                >
-                  <NumberInputField />
-                </NumberInput>
-              </FormControl>
-            </VStack>
-          </Box>
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="medium">运行时长 (秒)</FormLabel>
+                  <NumberInput
+                    size="sm"
+                    value={configData.run?.duration_seconds || 0}
+                    min={0}
+                    onChange={(_, val) => updateNestedField('run', 'duration_seconds', val)}
+                  >
+                    <NumberInputField />
+                  </NumberInput>
+                </FormControl>
+              </VStack>
+            </Box>
+          </SimpleGrid>
 
-          {/* 服务器配置 */}
-          <Box>
-            <Heading size="sm" mb={4} pb={2} borderBottom="2px" borderColor="blue.500">
-              服务器配置 (server)
-            </Heading>
-            <VStack spacing={4} align="stretch">
-              <FormControl>
-                <FormLabel>主机名列表 (hostname)</FormLabel>
-                <Wrap spacing={2} mb={2}>
-                  {(configData.server?.hostname || []).map((host, index) => (
-                    <WrapItem key={index}>
-                      <Tag size="md" colorScheme="blue" variant="solid">
-                        <TagLabel>{host}</TagLabel>
-                        <TagCloseButton onClick={() => removeTag('server', 'hostname', index)} />
-                      </Tag>
-                    </WrapItem>
-                  ))}
-                </Wrap>
-                <Button
-                  size="sm"
-                  leftIcon={<AddIcon />}
-                  onClick={() => addTag('server', 'hostname')}
-                >
-                  添加
-                </Button>
-              </FormControl>
+          {/* 服务器配置 & 客户端配置 */}
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+            {/* 服务器配置 */}
+            <Box bg="white" p={6} borderRadius="lg" shadow="sm">
+              <Heading size="md" mb={4} color="cyan.600">
+                服务器配置
+              </Heading>
+              <VStack spacing={4} align="stretch">
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="medium">主机名</FormLabel>
+                  <Wrap spacing={2} mb={2} minH="40px" p={2} bg="gray.50" borderRadius="md">
+                    {(configData.server?.hostname || []).map((host, index) => (
+                      <WrapItem key={index}>
+                        <Tag size="md" colorScheme="cyan" variant="subtle">
+                          <TagLabel>{host}</TagLabel>
+                          <TagCloseButton onClick={() => removeTag('server', 'hostname', index)} />
+                        </Tag>
+                      </WrapItem>
+                    ))}
+                  </Wrap>
+                  <Button
+                    size="xs"
+                    leftIcon={<AddIcon />}
+                    onClick={() => addTag('server', 'hostname')}
+                    colorScheme="cyan"
+                    variant="outline"
+                  >
+                    添加主机名
+                  </Button>
+                </FormControl>
 
-              <FormControl>
-                <FormLabel>HCA 列表 (hca)</FormLabel>
-                <Wrap spacing={2} mb={2}>
-                  {(configData.server?.hca || []).map((hca, index) => (
-                    <WrapItem key={index}>
-                      <Tag size="md" colorScheme="green" variant="solid">
-                        <TagLabel>{hca}</TagLabel>
-                        <TagCloseButton onClick={() => removeTag('server', 'hca', index)} />
-                      </Tag>
-                    </WrapItem>
-                  ))}
-                </Wrap>
-                <Button
-                  size="sm"
-                  leftIcon={<AddIcon />}
-                  onClick={() => addTag('server', 'hca')}
-                >
-                  添加
-                </Button>
-              </FormControl>
-            </VStack>
-          </Box>
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="medium">HCA 列表</FormLabel>
+                  <Wrap spacing={2} mb={2} minH="40px" p={2} bg="gray.50" borderRadius="md">
+                    {(configData.server?.hca || []).map((hca, index) => (
+                      <WrapItem key={index}>
+                        <Tag size="md" colorScheme="teal" variant="subtle">
+                          <TagLabel>{hca}</TagLabel>
+                          <TagCloseButton onClick={() => removeTag('server', 'hca', index)} />
+                        </Tag>
+                      </WrapItem>
+                    ))}
+                  </Wrap>
+                  <Button
+                    size="xs"
+                    leftIcon={<AddIcon />}
+                    onClick={() => addTag('server', 'hca')}
+                    colorScheme="teal"
+                    variant="outline"
+                  >
+                    添加 HCA
+                  </Button>
+                </FormControl>
+              </VStack>
+            </Box>
 
-          {/* 客户端配置 */}
-          <Box>
-            <Heading size="sm" mb={4} pb={2} borderBottom="2px" borderColor="blue.500">
-              客户端配置 (client)
-            </Heading>
-            <VStack spacing={4} align="stretch">
-              <FormControl>
-                <FormLabel>主机名列表 (hostname)</FormLabel>
-                <Wrap spacing={2} mb={2}>
-                  {(configData.client?.hostname || []).map((host, index) => (
-                    <WrapItem key={index}>
-                      <Tag size="md" colorScheme="purple" variant="solid">
-                        <TagLabel>{host}</TagLabel>
-                        <TagCloseButton onClick={() => removeTag('client', 'hostname', index)} />
-                      </Tag>
-                    </WrapItem>
-                  ))}
-                </Wrap>
-                <Button
-                  size="sm"
-                  leftIcon={<AddIcon />}
-                  onClick={() => addTag('client', 'hostname')}
-                >
-                  添加
-                </Button>
-              </FormControl>
+            {/* 客户端配置 */}
+            <Box bg="white" p={6} borderRadius="lg" shadow="sm">
+              <Heading size="md" mb={4} color="orange.600">
+                客户端配置
+              </Heading>
+              <VStack spacing={4} align="stretch">
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="medium">主机名</FormLabel>
+                  <Wrap spacing={2} mb={2} minH="40px" p={2} bg="gray.50" borderRadius="md">
+                    {(configData.client?.hostname || []).map((host, index) => (
+                      <WrapItem key={index}>
+                        <Tag size="md" colorScheme="orange" variant="subtle">
+                          <TagLabel>{host}</TagLabel>
+                          <TagCloseButton onClick={() => removeTag('client', 'hostname', index)} />
+                        </Tag>
+                      </WrapItem>
+                    ))}
+                  </Wrap>
+                  <Button
+                    size="xs"
+                    leftIcon={<AddIcon />}
+                    onClick={() => addTag('client', 'hostname')}
+                    colorScheme="orange"
+                    variant="outline"
+                  >
+                    添加主机名
+                  </Button>
+                </FormControl>
 
-              <FormControl>
-                <FormLabel>HCA 列表 (hca)</FormLabel>
-                <Wrap spacing={2} mb={2}>
-                  {(configData.client?.hca || []).map((hca, index) => (
-                    <WrapItem key={index}>
-                      <Tag size="md" colorScheme="orange" variant="solid">
-                        <TagLabel>{hca}</TagLabel>
-                        <TagCloseButton onClick={() => removeTag('client', 'hca', index)} />
-                      </Tag>
-                    </WrapItem>
-                  ))}
-                </Wrap>
-                <Button
-                  size="sm"
-                  leftIcon={<AddIcon />}
-                  onClick={() => addTag('client', 'hca')}
-                >
-                  添加
-                </Button>
-              </FormControl>
-            </VStack>
-          </Box>
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="medium">HCA 列表</FormLabel>
+                  <Wrap spacing={2} mb={2} minH="40px" p={2} bg="gray.50" borderRadius="md">
+                    {(configData.client?.hca || []).map((hca, index) => (
+                      <WrapItem key={index}>
+                        <Tag size="md" colorScheme="pink" variant="subtle">
+                          <TagLabel>{hca}</TagLabel>
+                          <TagCloseButton onClick={() => removeTag('client', 'hca', index)} />
+                        </Tag>
+                      </WrapItem>
+                    ))}
+                  </Wrap>
+                  <Button
+                    size="xs"
+                    leftIcon={<AddIcon />}
+                    onClick={() => addTag('client', 'hca')}
+                    colorScheme="pink"
+                    variant="outline"
+                  >
+                    添加 HCA
+                  </Button>
+                </FormControl>
+              </VStack>
+            </Box>
+          </SimpleGrid>
         </VStack>
       </Box>
     </Box>
