@@ -15,40 +15,40 @@ const (
 
 // Config holds the entire configuration from the YAML file.
 type Config struct {
-	StartPort          int          `yaml:"start_port"`
-	StreamType         string       `yaml:"stream_type"`
-	QpNum              int          `yaml:"qp_num"`
-	MessageSizeBytes   int          `yaml:"message_size_bytes"`
-	OutputBase         string       `yaml:"output_base"`
-	WaitingTimeSeconds int          `yaml:"waiting_time_seconds"`
-	Speed              float64      `yaml:"speed"` // in Gbps
-	RdmaCm             bool         `yaml:"rdma_cm"`
-	Report             Report       `yaml:"report"`
-	Run                Run          `yaml:"run"`
-	Server             ServerConfig `yaml:"server"`
-	Client             ClientConfig `yaml:"client"`
+	StartPort          int          `yaml:"start_port" json:"start_port"`
+	StreamType         string       `yaml:"stream_type" json:"stream_type"`
+	QpNum              int          `yaml:"qp_num" json:"qp_num"`
+	MessageSizeBytes   int          `yaml:"message_size_bytes" json:"message_size_bytes"`
+	OutputBase         string       `yaml:"output_base" json:"output_base"`
+	WaitingTimeSeconds int          `yaml:"waiting_time_seconds" json:"waiting_time_seconds"`
+	Speed              float64      `yaml:"speed" json:"speed"` // in Gbps
+	RdmaCm             bool         `yaml:"rdma_cm" json:"rdma_cm"`
+	Report             Report       `yaml:"report" json:"report"`
+	Run                Run          `yaml:"run" json:"run"`
+	Server             ServerConfig `yaml:"server" json:"server"`
+	Client             ClientConfig `yaml:"client" json:"client"`
 }
 
 type Report struct {
-	Enable bool   `yaml:"enable"`
-	Dir    string `yaml:"dir"`
+	Enable bool   `yaml:"enable" json:"enable"`
+	Dir    string `yaml:"dir" json:"dir"`
 }
 
 type Run struct {
-	Infinitely      bool `yaml:"infinitely"`
-	DurationSeconds int  `yaml:"duration_seconds"`
+	Infinitely      bool `yaml:"infinitely" json:"infinitely"`
+	DurationSeconds int  `yaml:"duration_seconds" json:"duration_seconds"`
 }
 
 // ServerConfig holds the server-specific settings.
 type ServerConfig struct {
-	Hostname []string `yaml:"hostname"`
-	Hca      []string `yaml:"hca"`
+	Hostname []string `yaml:"hostname" json:"hostname"`
+	Hca      []string `yaml:"hca" json:"hca"`
 }
 
 // ClientConfig holds the client-specific settings.
 type ClientConfig struct {
-	Hostname []string `yaml:"hostname"`
-	Hca      []string `yaml:"hca"`
+	Hostname []string `yaml:"hostname" json:"hostname"`
+	Hca      []string `yaml:"hca" json:"hca"`
 }
 
 func (c *Config) IsFullMesh() bool {

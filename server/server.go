@@ -2,6 +2,10 @@ package server
 
 import (
 	"fmt"
+	"io/fs"
+	"net/http"
+
+	"xnetperf/web"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,6 +33,18 @@ func NewServer(port int) *Server {
 
 // setupRoutes 设置路由
 func (s *Server) setupRoutes() {
+	// 静态文件服务（Web UI）
+	staticFS, err := fs.Sub(web.Static, "static")
+	if err != nil {
+		panic(err)
+	}
+	s.engine.StaticFS("/ui", http.FS(staticFS))
+
+	// 根路径重定向到 Web UI
+	s.engine.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/ui/")
+	})
+
 	// API 分组
 	api := s.engine.Group("/api")
 	{
@@ -54,7 +70,9 @@ func (s *Server) setupRoutes() {
 func (s *Server) Start() error {
 	addr := fmt.Sprintf(":%d", s.port)
 	fmt.Printf("HTTP Server starting on http://localhost%s\n", addr)
-	fmt.Println("API Endpoints:")
+	fmt.Println("\n🌐 Web UI:")
+	fmt.Printf("  http://localhost%s/\n", addr)
+	fmt.Println("\n📡 API Endpoints:")
 	fmt.Println("  GET    /health")
 	fmt.Println("  GET    /api/configs")
 	fmt.Println("  GET    /api/configs/:name")
