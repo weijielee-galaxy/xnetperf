@@ -97,6 +97,32 @@ func (s *ConfigService) GetConfig(c *gin.Context) {
 	c.JSON(200, Success(cfg))
 }
 
+// PreviewConfig 预览配置文件（返回 YAML 格式）
+func (s *ConfigService) PreviewConfig(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(400, Error(400, "配置文件名不能为空"))
+		return
+	}
+
+	// 构建文件路径
+	var filePath string
+	if name == DefaultConfigFile {
+		filePath = DefaultConfigFile
+	} else {
+		filePath = filepath.Join(ConfigsDir, name)
+	}
+
+	// 读取配置文件原始内容
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		c.JSON(404, Error(404, fmt.Sprintf("配置文件不存在或读取失败: %v", err)))
+		return
+	}
+
+	c.JSON(200, Success(gin.H{"yaml": string(data)}))
+}
+
 // CreateConfig 创建新配置文件
 func (s *ConfigService) CreateConfig(c *gin.Context) {
 	var req struct {

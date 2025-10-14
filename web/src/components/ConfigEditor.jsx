@@ -22,15 +22,49 @@ import {
   Spinner,
   Center,
   Text,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
+  Code,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  MenuDivider,
 } from '@chakra-ui/react'
 import { AddIcon } from '@chakra-ui/icons'
-import { useState } from 'react'
-import { updateConfig, validateConfig } from '../api'
+import { useState, useEffect } from 'react'
+import { updateConfig, validateConfig, previewConfig, fetchHostnames, fetchHCAs } from '../api'
 
 function ConfigEditor({ currentConfig, configData, originalData, loading, onSave, onCancel, onChange }) {
   const [saving, setSaving] = useState(false)
   const [validating, setValidating] = useState(false)
+  const [previewYaml, setPreviewYaml] = useState('')
+  const [hostnameDict, setHostnameDict] = useState([])
+  const [hcaDict, setHcaDict] = useState([])
+  const { isOpen, onOpen, onClose } = useDisclosure()
   const toast = useToast()
+
+  // 加载字典
+  useEffect(() => {
+    const loadDictionaries = async () => {
+      try {
+        const [hostnames, hcas] = await Promise.all([
+          fetchHostnames(),
+          fetchHCAs()
+        ])
+        setHostnameDict(hostnames)
+        setHcaDict(hcas)
+      } catch (error) {
+        console.error('加载字典失败:', error)
+      }
+    }
+    loadDictionaries()
+  }, [])
 
   // 空状态
   if (!currentConfig) {
@@ -64,18 +98,28 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
     })
   }
 
-  // 添加标签
-  const addTag = (parent, field) => {
-    const input = prompt(`添加 ${field}:`)
-    if (input && input.trim()) {
+  // 添加标签（从字典或手动输入）
+  const addTagFromDict = (parent, field, value) => {
+    if (value && value.trim()) {
       const current = configData[parent][field] || []
-      onChange({
-        ...configData,
-        [parent]: {
-          ...configData[parent],
-          [field]: [...current, input.trim()],
-        },
-      })
+      // 避免重复添加
+      if (!current.includes(value.trim())) {
+        onChange({
+          ...configData,
+          [parent]: {
+            ...configData[parent],
+            [field]: [...current, value.trim()],
+          },
+        })
+      }
+    }
+  }
+
+  // 手动输入添加标签
+  const addTagManually = (parent, field, fieldName) => {
+    const input = prompt(`手动输入 ${fieldName}:`)
+    if (input && input.trim()) {
+      addTagFromDict(parent, field, input.trim())
     }
   }
 
@@ -125,14 +169,37 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
         duration: 2000,
       })
     } catch (error) {
+      // 如果有详细错误列表，显示完整信息
+      let description = error.message
+      if (error.errors && error.errors.length > 0) {
+        description = error.errors.join('\n')
+      }
+      
       toast({
         title: '✗ 配置验证失败',
+        description: description,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
+    } finally {
+      setValidating(false)
+    }
+  }
+
+  // 预览配置
+  const handlePreview = async () => {
+    try {
+      const result = await previewConfig(currentConfig)
+      setPreviewYaml(result.yaml)
+      onOpen()
+    } catch (error) {
+      toast({
+        title: '预览失败',
         description: error.message,
         status: 'error',
         duration: 3000,
       })
-    } finally {
-      setValidating(false)
     }
   }
 
@@ -145,6 +212,9 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
           <Heading size="md" color="gray.700">{currentConfig}</Heading>
         </HStack>
         <HStack spacing={2}>
+          <Button size="sm" colorScheme="purple" variant="outline" onClick={handlePreview}>
+            预览
+          </Button>
           <Button size="sm" colorScheme="blue" variant="outline" onClick={handleValidate} isLoading={validating}>
             验证
           </Button>
@@ -338,15 +408,41 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
                       </WrapItem>
                     ))}
                   </Wrap>
-                  <Button
-                    size="xs"
-                    leftIcon={<AddIcon />}
-                    onClick={() => addTag('server', 'hostname')}
-                    colorScheme="cyan"
-                    variant="outline"
-                  >
-                    添加主机名
-                  </Button>
+                  <Menu>
+                    <MenuButton
+                      as={Button}
+                      size="xs"
+                      leftIcon={<AddIcon />}
+                      colorScheme="cyan"
+                      variant="outline"
+                    >
+                      添加主机名
+                    </MenuButton>
+                    <MenuList maxH="300px" overflowY="auto">
+                      {hostnameDict.length > 0 ? (
+                        <>
+                          {hostnameDict.map((hostname, idx) => (
+                            <MenuItem
+                              key={idx}
+                              onClick={() => addTagFromDict('server', 'hostname', hostname)}
+                              fontSize="sm"
+                            >
+                              {hostname}
+                            </MenuItem>
+                          ))}
+                          <MenuDivider />
+                        </>
+                      ) : null}
+                      <MenuItem
+                        onClick={() => addTagManually('server', 'hostname', '主机名')}
+                        fontWeight="bold"
+                        color="blue.600"
+                        fontSize="sm"
+                      >
+                        ✏️ 手动输入...
+                      </MenuItem>
+                    </MenuList>
+                  </Menu>
                 </FormControl>
 
                 <FormControl>
@@ -361,15 +457,41 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
                       </WrapItem>
                     ))}
                   </Wrap>
-                  <Button
-                    size="xs"
-                    leftIcon={<AddIcon />}
-                    onClick={() => addTag('server', 'hca')}
-                    colorScheme="teal"
-                    variant="outline"
-                  >
-                    添加 HCA
-                  </Button>
+                  <Menu>
+                    <MenuButton
+                      as={Button}
+                      size="xs"
+                      leftIcon={<AddIcon />}
+                      colorScheme="teal"
+                      variant="outline"
+                    >
+                      添加 HCA
+                    </MenuButton>
+                    <MenuList maxH="300px" overflowY="auto">
+                      {hcaDict.length > 0 ? (
+                        <>
+                          {hcaDict.map((hca, idx) => (
+                            <MenuItem
+                              key={idx}
+                              onClick={() => addTagFromDict('server', 'hca', hca)}
+                              fontSize="sm"
+                            >
+                              {hca}
+                            </MenuItem>
+                          ))}
+                          <MenuDivider />
+                        </>
+                      ) : null}
+                      <MenuItem
+                        onClick={() => addTagManually('server', 'hca', 'HCA')}
+                        fontWeight="bold"
+                        color="blue.600"
+                        fontSize="sm"
+                      >
+                        ✏️ 手动输入...
+                      </MenuItem>
+                    </MenuList>
+                  </Menu>
                 </FormControl>
               </VStack>
             </Box>
@@ -392,15 +514,41 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
                       </WrapItem>
                     ))}
                   </Wrap>
-                  <Button
-                    size="xs"
-                    leftIcon={<AddIcon />}
-                    onClick={() => addTag('client', 'hostname')}
-                    colorScheme="orange"
-                    variant="outline"
-                  >
-                    添加主机名
-                  </Button>
+                  <Menu>
+                    <MenuButton
+                      as={Button}
+                      size="xs"
+                      leftIcon={<AddIcon />}
+                      colorScheme="orange"
+                      variant="outline"
+                    >
+                      添加主机名
+                    </MenuButton>
+                    <MenuList maxH="300px" overflowY="auto">
+                      {hostnameDict.length > 0 ? (
+                        <>
+                          {hostnameDict.map((hostname, idx) => (
+                            <MenuItem
+                              key={idx}
+                              onClick={() => addTagFromDict('client', 'hostname', hostname)}
+                              fontSize="sm"
+                            >
+                              {hostname}
+                            </MenuItem>
+                          ))}
+                          <MenuDivider />
+                        </>
+                      ) : null}
+                      <MenuItem
+                        onClick={() => addTagManually('client', 'hostname', '主机名')}
+                        fontWeight="bold"
+                        color="blue.600"
+                        fontSize="sm"
+                      >
+                        ✏️ 手动输入...
+                      </MenuItem>
+                    </MenuList>
+                  </Menu>
                 </FormControl>
 
                 <FormControl>
@@ -415,21 +563,70 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
                       </WrapItem>
                     ))}
                   </Wrap>
-                  <Button
-                    size="xs"
-                    leftIcon={<AddIcon />}
-                    onClick={() => addTag('client', 'hca')}
-                    colorScheme="pink"
-                    variant="outline"
-                  >
-                    添加 HCA
-                  </Button>
+                  <Menu>
+                    <MenuButton
+                      as={Button}
+                      size="xs"
+                      leftIcon={<AddIcon />}
+                      colorScheme="pink"
+                      variant="outline"
+                    >
+                      添加 HCA
+                    </MenuButton>
+                    <MenuList maxH="300px" overflowY="auto">
+                      {hcaDict.length > 0 ? (
+                        <>
+                          {hcaDict.map((hca, idx) => (
+                            <MenuItem
+                              key={idx}
+                              onClick={() => addTagFromDict('client', 'hca', hca)}
+                              fontSize="sm"
+                            >
+                              {hca}
+                            </MenuItem>
+                          ))}
+                          <MenuDivider />
+                        </>
+                      ) : null}
+                      <MenuItem
+                        onClick={() => addTagManually('client', 'hca', 'HCA')}
+                        fontWeight="bold"
+                        color="blue.600"
+                        fontSize="sm"
+                      >
+                        ✏️ 手动输入...
+                      </MenuItem>
+                    </MenuList>
+                  </Menu>
                 </FormControl>
               </VStack>
             </Box>
           </SimpleGrid>
         </VStack>
       </Box>
+
+      {/* 预览 Modal */}
+      <Modal isOpen={isOpen} onClose={onClose} size="4xl">
+        <ModalOverlay />
+        <ModalContent maxH="90vh">
+          <ModalHeader>配置预览 - {currentConfig}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody pb={6} overflow="auto">
+            <Code
+              display="block"
+              whiteSpace="pre"
+              p={4}
+              borderRadius="md"
+              bg="gray.50"
+              fontSize="sm"
+              fontFamily="monospace"
+              overflowX="auto"
+            >
+              {previewYaml}
+            </Code>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </Box>
   )
 }

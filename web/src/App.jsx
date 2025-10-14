@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'react'
 import {
   Box,
-  Flex,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
   Heading,
   useToast,
 } from '@chakra-ui/react'
-import ConfigList from './components/ConfigList'
-import ConfigEditor from './components/ConfigEditor'
+import ConfigPage from './pages/ConfigPage'
+import DictionaryPage from './pages/DictionaryPage'
 import { fetchConfigs, fetchConfig } from './api'
 
 function App() {
@@ -64,32 +68,38 @@ function App() {
         <Heading size="md">xnetperf 配置管理</Heading>
       </Box>
 
-      {/* Main Content */}
-      <Flex h="calc(100vh - 64px)">
-        {/* Sidebar */}
-        <ConfigList
-          configs={configs}
-          currentConfig={currentConfig}
-          onSelect={selectConfig}
-          onRefresh={loadConfigs}
-        />
+      {/* Tabs Navigation */}
+      <Tabs colorScheme="blue" h="calc(100vh - 64px)" display="flex" flexDirection="column">
+        <TabList px={4} bg="white" borderBottomWidth="1px">
+          <Tab>配置管理</Tab>
+          <Tab>字典管理</Tab>
+        </TabList>
 
-        {/* Content Area */}
-        <ConfigEditor
-          currentConfig={currentConfig}
-          configData={configData}
-          originalData={originalData}
-          loading={loading}
-          onSave={() => {
-            loadConfigs()
-            selectConfig(currentConfig)
-          }}
-          onCancel={() => {
-            setConfigData(JSON.parse(JSON.stringify(originalData)))
-          }}
-          onChange={setConfigData}
-        />
-      </Flex>
+        <TabPanels flex="1" overflow="hidden">
+          <TabPanel p={0} h="100%">
+            <ConfigPage
+              configs={configs}
+              currentConfig={currentConfig}
+              configData={configData}
+              originalData={originalData}
+              loading={loading}
+              onConfigSelect={selectConfig}
+              onRefresh={loadConfigs}
+              onConfigCreate={loadConfigs}
+              onConfigDelete={loadConfigs}
+              onConfigUpdate={() => {
+                loadConfigs()
+                selectConfig(currentConfig)
+              }}
+              onConfigChange={setConfigData}
+            />
+          </TabPanel>
+
+          <TabPanel p={0} h="100%">
+            <DictionaryPage />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </Box>
   )
 }

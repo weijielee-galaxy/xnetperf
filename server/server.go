@@ -11,9 +11,10 @@ import (
 
 // Server HTTP服务器
 type Server struct {
-	engine        *gin.Engine
-	configService *ConfigService
-	port          int
+	engine            *gin.Engine
+	configService     *ConfigService
+	dictionaryService *DictionaryService
+	port              int
 }
 
 // NewServer 创建HTTP服务器
@@ -21,9 +22,10 @@ func NewServer(port int) *Server {
 	gin.SetMode(gin.ReleaseMode)
 
 	server := &Server{
-		engine:        gin.Default(),
-		configService: NewConfigService(),
-		port:          port,
+		engine:            gin.Default(),
+		configService:     NewConfigService(),
+		dictionaryService: NewDictionaryService(),
+		port:              port,
 	}
 
 	server.setupRoutes()
@@ -40,10 +42,20 @@ func (s *Server) setupRoutes() {
 		{
 			configs.GET("", s.configService.ListConfigs)                    // 获取配置文件列表
 			configs.GET("/:name", s.configService.GetConfig)                // 获取指定配置文件
+			configs.GET("/:name/preview", s.configService.PreviewConfig)    // 预览配置文件（YAML格式）
 			configs.POST("", s.configService.CreateConfig)                  // 创建配置文件
 			configs.PUT("/:name", s.configService.UpdateConfig)             // 更新配置文件
 			configs.DELETE("/:name", s.configService.DeleteConfig)          // 删除配置文件
 			configs.POST("/:name/validate", s.configService.ValidateConfig) // 验证配置文件
+		}
+
+		// 字典管理API
+		dictionary := api.Group("/dictionary")
+		{
+			dictionary.GET("/hostnames", s.dictionaryService.GetHostnames)    // 获取主机名列表
+			dictionary.PUT("/hostnames", s.dictionaryService.UpdateHostnames) // 更新主机名列表
+			dictionary.GET("/hcas", s.dictionaryService.GetHCAs)              // 获取 HCA 列表
+			dictionary.PUT("/hcas", s.dictionaryService.UpdateHCAs)           // 更新 HCA 列表
 		}
 	}
 
