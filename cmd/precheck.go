@@ -575,3 +575,100 @@ func displayPrecheckResults(results []PrecheckResult) {
 	fmt.Printf("Summary: %d healthy, %d unhealthy, %d errors (Total: %d HCAs)\n",
 		healthy, unhealthy, errors, len(results))
 }
+
+// PrecheckSummary API 返回的 precheck 汇总信息
+type PrecheckSummary struct {
+	TotalHCAs      int              `json:"total_hcas"`
+	HealthyCount   int              `json:"healthy_count"`
+	UnhealthyCount int              `json:"unhealthy_count"`
+	ErrorCount     int              `json:"error_count"`
+	AllHealthy     bool             `json:"all_healthy"`
+	AllSpeedsSame  bool             `json:"all_speeds_same"`
+	CheckPassed    bool             `json:"check_passed"`
+	Results        []PrecheckResult `json:"results"`
+	SpeedStats     map[string]int   `json:"speed_stats"`    // 速度统计
+	FwVerStats     map[string]int   `json:"fw_ver_stats"`   // 固件版本统计
+	BoardIdStats   map[string]int   `json:"board_id_stats"` // 板卡ID统计
+}
+
+// ExecPrecheck 执行 precheck 并返回结构化数据（用于 API）
+func ExecPrecheck(cfg *config.Config) (*PrecheckSummary, error) {
+	// 收集所有需要检查的主机和HCA
+	var checkItems []struct {
+		hostname string
+		hca      string
+	}
+
+	// 添加服务器端的HCA
+	for _, hostname := range cfg.Server.Hostname {
+		for _, hca := range cfg.Server.Hca {
+			checkItems = append(checkItems, struct {
+				hostname string
+				hca      string
+			}{hostname, hca})
+		}
+	}
+
+	// 添加客户端的HCA
+	for _, hostname := range cfg.Client.Hostname {
+		for _, hca := range cfg.Client.Hca {
+			checkItems = append(checkItems, struct {
+				hostname string
+				hca      string
+			}{hostname, hca})
+		}
+	}
+
+	if len(checkItems) == 0 {
+		return nil, fmt.Errorf("no HCAs configured in config file")
+	}
+
+	// 并发执行检查
+	results := precheckAllHCAs(checkItems)
+
+	// 统计信息
+	summary := &PrecheckSummary{
+		TotalHCAs:    len(results),
+		Results:      results,
+		SpeedStats:   make(map[string]int),
+		FwVerStats:   make(map[string]int),
+		BoardIdStats: make(map[string]int),
+	}
+
+	// 统计各项数据
+	for _, result := range results {
+		if result.Error != "" {
+			summary.ErrorCount++
+		} else if result.IsHealthy {
+			summary.HealthyCount++
+		} else {
+			summary.UnhealthyCount++
+		}
+
+		// 统计 speed
+		if result.Speed != "" {
+			summary.SpeedStats[result.Speed]++
+		}
+
+		// 统计 fw_ver
+		if result.FwVer != "" {
+			summary.FwVerStats[result.FwVer]++
+		}
+
+		// 统计 board_id
+		if result.BoardId != "" {
+			summary.BoardIdStats[result.BoardId]++
+		}
+	}
+
+	// 检查是否所有HCA都健康
+	summary.AllHealthy = (summary.HealthyCount == summary.TotalHCAs)
+
+	// 检查所有 speed 是否相同
+	summary.AllSpeedsSame = (len(summary.SpeedStats) <= 1)
+
+	// 总体检查结果
+	summary.CheckPassed = summary.AllHealthy && summary.AllSpeedsSame
+
+	return summary, nil
+}

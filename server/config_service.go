@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"xnetperf/config"
+	"xnetperf/precheck"
 
 	"github.com/gin-gonic/gin"
 	"gopkg.in/yaml.v3"
@@ -368,4 +369,44 @@ func (s *ConfigService) ValidateConfig(c *gin.Context) {
 			"config": cfg,
 		},
 	})
+}
+
+// PrecheckConfig 执行配置文件的 precheck 检查
+func (s *ConfigService) PrecheckConfig(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(400, Error(400, "配置文件名不能为空"))
+		return
+	}
+
+	// 构建文件路径
+	var filePath string
+	if name == DefaultConfigFile {
+		filePath = DefaultConfigFile
+	} else {
+		filePath = filepath.Join(ConfigsDir, name)
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(404, Error(404, "配置文件不存在"))
+		return
+	}
+
+	// 加载并验证配置文件
+	cfg, err := config.LoadConfig(filePath)
+	if err != nil {
+		c.JSON(400, Error(400, fmt.Sprintf("配置文件解析失败: %v", err)))
+		return
+	}
+
+	// 执行 precheck
+	summary, err := precheck.Execute(cfg)
+	if err != nil {
+		c.JSON(500, Error(500, fmt.Sprintf("Precheck 执行失败: %v", err)))
+		return
+	}
+
+	// 返回检查结果
+	c.JSON(200, Success(summary))
 }

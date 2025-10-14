@@ -47,6 +47,7 @@ func (s *Server) setupRoutes() {
 			configs.PUT("/:name", s.configService.UpdateConfig)             // 更新配置文件
 			configs.DELETE("/:name", s.configService.DeleteConfig)          // 删除配置文件
 			configs.POST("/:name/validate", s.configService.ValidateConfig) // 验证配置文件
+			configs.POST("/:name/precheck", s.configService.PrecheckConfig) // 执行 precheck 检查
 		}
 
 		// 字典管理API

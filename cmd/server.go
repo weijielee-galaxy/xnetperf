@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-
 	"xnetperf/server"
 
 	"github.com/spf13/cobra"

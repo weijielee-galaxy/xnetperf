@@ -11,6 +11,7 @@ import {
 } from '@chakra-ui/react'
 import ConfigPage from './pages/ConfigPage'
 import DictionaryPage from './pages/DictionaryPage'
+import PrecheckPage from './pages/PrecheckPage'
 import { fetchConfigs, fetchConfig } from './api'
 
 function App() {
@@ -73,6 +74,7 @@ function App() {
         <TabList px={4} bg="white" borderBottomWidth="1px">
           <Tab>配置管理</Tab>
           <Tab>字典管理</Tab>
+          <Tab>PreCheck 检查</Tab>
         </TabList>
 
         <TabPanels flex="1" overflow="hidden">
@@ -97,6 +99,10 @@ function App() {
 
           <TabPanel p={0} h="100%">
             <DictionaryPage />
+          </TabPanel>
+
+          <TabPanel p={0} h="100%">
+            <PrecheckPage configs={configs} />
           </TabPanel>
         </TabPanels>
       </Tabs>

@@ -122,3 +122,10 @@ export async function updateHCAs(hcas) {
     body: JSON.stringify({ hcas }),
   })
 }
+
+// 执行 Precheck 检查
+export async function runPrecheck(name) {
+  return await fetchJSON(`${API_BASE}/configs/${name}/precheck`, {
+    method: 'POST',
+  })
+}
