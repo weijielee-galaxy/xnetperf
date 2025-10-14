@@ -5,6 +5,22 @@ const app = {
     formData: {},
     originalData: {},
     
+    // 辅助函数：安全地解析 JSON 响应
+    async fetchJSON(url, options = {}) {
+        const response = await fetch(url, options);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const text = await response.text();
+        if (!text || text.trim() === '') {
+            throw new Error('Empty response from server');
+        }
+        
+        return JSON.parse(text);
+    },
+    
     // 初始化
     init() {
         this.loadConfigs();
@@ -13,19 +29,7 @@ const app = {
     // 加载配置列表
     async loadConfigs() {
         try {
-            const response = await fetch('/api/configs');
-            
-            // 检查响应状态
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            // 获取响应文本用于调试
-            const text = await response.text();
-            console.log('API Response:', text);
-            
-            // 解析 JSON
-            const result = JSON.parse(text);
+            const result = await this.fetchJSON('/api/configs');
             
             // API 返回格式: {code: 0, message: "success", data: [...]}
             if (result.code === 0 && result.data) {
@@ -73,8 +77,7 @@ const app = {
     // 选择配置
     async selectConfig(name) {
         try {
-            const response = await fetch(`/api/configs/${name}`);
-            const result = await response.json();
+            const result = await this.fetchJSON(`/api/configs/${name}`);
             
             // API 返回格式: {code: 0, message: "success", data: {...}}
             if (result.code !== 0) {
@@ -237,13 +240,11 @@ const app = {
         const data = this.collectFormData();
         
         try {
-            const response = await fetch(`/api/configs/${this.currentConfig}`, {
+            const result = await this.fetchJSON(`/api/configs/${this.currentConfig}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
-            
-            const result = await response.json();
             
             if (result.code === 0) {
                 this.showMessage('保存成功！', 'success');
@@ -270,10 +271,9 @@ const app = {
         if (!this.currentConfig) return;
         
         try {
-            const response = await fetch(`/api/configs/${this.currentConfig}/validate`, {
+            const result = await this.fetchJSON(`/api/configs/${this.currentConfig}/validate`, {
                 method: 'POST'
             });
-            const result = await response.json();
             
             if (result.code === 0) {
                 this.showMessage('✓ 配置验证通过！', 'success');
@@ -358,29 +358,20 @@ const app = {
         const filename = name.endsWith('.yaml') ? name : name + '.yaml';
         
         try {
-            const response = await fetch('/api/configs', {
+            // 发送空配置，让后端 ApplyDefaults() 应用默认值
+            // 这样前后端只需要维护一套默认值（在 config/config.go 中）
+            const result = await this.fetchJSON('/api/configs', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: filename,
                     config: {
-                        start_port: 20000,
-                        stream_type: 'fullmesh',
-                        qp_num: 1,
-                        message_size_bytes: 8192,
-                        output_base: './output',
-                        waiting_time_seconds: 5,
-                        speed: 0,
-                        rdma_cm: false,
-                        report: { enable: true, dir: './reports' },
-                        run: { infinitely: false, duration_seconds: 60 },
+                        // 只设置必须的字段，其他由后端 ApplyDefaults() 填充
                         server: { hostname: [], hca: [] },
                         client: { hostname: [], hca: [] }
                     }
                 })
             });
-            
-            const result = await response.json();
             
             if (result.code === 0) {
                 this.showMessage('创建成功！', 'success');
@@ -402,11 +393,9 @@ const app = {
         }
         
         try {
-            const response = await fetch(`/api/configs/${name}`, {
+            const result = await this.fetchJSON(`/api/configs/${name}`, {
                 method: 'DELETE'
             });
-            
-            const result = await response.json();
             
             if (result.code === 0) {
                 this.showMessage('删除成功！', 'success');
