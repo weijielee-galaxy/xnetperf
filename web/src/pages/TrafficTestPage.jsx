@@ -18,6 +18,12 @@ import {
   AlertTitle,
   AlertDescription,
   Spinner,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
 } from '@chakra-ui/react'
 import { CheckCircleIcon, WarningIcon, TimeIcon } from '@chakra-ui/icons'
 import ProbeResults from '../components/ProbeResults'
@@ -442,7 +448,7 @@ function TrafficTestPage({ configs }) {
           </CardBody>
         </Card>
 
-        {/* 工作流步骤显示 */}
+        {/* 工作流步骤显示 - 时间线样式 */}
         {currentStep !== STEPS.IDLE && (
           <Card>
             <CardBody>
@@ -474,29 +480,102 @@ function TrafficTestPage({ configs }) {
                   />
                 </Box>
 
-                {/* 步骤列表 */}
-                <VStack spacing={3} align="stretch">
-                  {[
-                    STEPS.PRECHECK,
-                    STEPS.RUN,
-                    STEPS.PROBE,
-                    STEPS.COLLECT,
-                    STEPS.REPORT,
-                  ].map(step => (
-                    <HStack key={step} spacing={3}>
-                      <Box w="24px">{renderStepIcon(step)}</Box>
-                      <Text fontWeight="medium" minW="120px">
-                        {STEP_LABELS[step]}
-                      </Text>
-                      {renderStepBadge(step)}
-                      {stepStatus[step]?.message && (
-                        <Text fontSize="sm" color="gray.600">
-                          {stepStatus[step].message}
-                        </Text>
-                      )}
-                    </HStack>
-                  ))}
-                </VStack>
+                {/* 时间线样式的步骤列表 */}
+                <Box position="relative" pl={8}>
+                  {/* 时间线主线 */}
+                  <Box
+                    position="absolute"
+                    left="15px"
+                    top="12px"
+                    bottom="12px"
+                    width="2px"
+                    bg="gray.200"
+                  />
+
+                  {/* 步骤节点 */}
+                  <VStack spacing={6} align="stretch">
+                    {[
+                      STEPS.PRECHECK,
+                      STEPS.RUN,
+                      STEPS.PROBE,
+                      STEPS.COLLECT,
+                      STEPS.REPORT,
+                    ].map((step, index) => {
+                      const status = stepStatus[step]?.status
+                      const isActive = currentStep === step
+                      
+                      return (
+                        <Box key={step} position="relative">
+                          {/* 时间线节点圆圈 */}
+                          <Box
+                            position="absolute"
+                            left="-23px"
+                            top="2px"
+                            w="32px"
+                            h="32px"
+                            borderRadius="full"
+                            bg={
+                              status === 'success'
+                                ? 'green.500'
+                                : status === 'error'
+                                ? 'red.500'
+                                : status === 'warning'
+                                ? 'orange.500'
+                                : status === 'running'
+                                ? 'blue.500'
+                                : 'gray.300'
+                            }
+                            border="4px solid white"
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="center"
+                            boxShadow={isActive ? '0 0 0 4px rgba(66, 153, 225, 0.3)' : 'sm'}
+                            transition="all 0.3s"
+                          >
+                            {status === 'running' ? (
+                              <Spinner size="sm" color="white" />
+                            ) : status === 'success' ? (
+                              <CheckCircleIcon color="white" boxSize={4} />
+                            ) : status === 'error' || status === 'warning' ? (
+                              <WarningIcon color="white" boxSize={4} />
+                            ) : (
+                              <TimeIcon color="white" boxSize={4} />
+                            )}
+                          </Box>
+
+                          {/* 步骤内容 */}
+                          <Box
+                            bg={isActive ? 'blue.50' : 'white'}
+                            p={4}
+                            borderRadius="md"
+                            border="1px solid"
+                            borderColor={isActive ? 'blue.200' : 'gray.200'}
+                            transition="all 0.3s"
+                            _hover={{ shadow: 'md' }}
+                          >
+                            <HStack justify="space-between" mb={2}>
+                              <HStack>
+                                <Text fontWeight="bold" fontSize="md">
+                                  {STEP_LABELS[step]}
+                                </Text>
+                                {renderStepBadge(step)}
+                              </HStack>
+                              <Text fontSize="xs" color="gray.500">
+                                步骤 {index + 1}/5
+                              </Text>
+                            </HStack>
+                            
+                            {stepStatus[step]?.message && (
+                              <Text fontSize="sm" color="gray.600" mt={2}>
+                                {stepStatus[step].message}
+                              </Text>
+                            )}
+                          </Box>
+                        </Box>
+                      )
+                    })}
+                  </VStack>
+                </Box>
               </VStack>
             </CardBody>
           </Card>
@@ -520,6 +599,8 @@ function TrafficTestPage({ configs }) {
               <VStack spacing={4} align="stretch">
                 <Heading size="sm">PreCheck 检查结果</Heading>
                 <Divider />
+                
+                {/* 汇总信息 */}
                 <Alert
                   status={precheckData.check_passed ? 'success' : 'warning'}
                   variant="subtle"
@@ -530,10 +611,79 @@ function TrafficTestPage({ configs }) {
                       {precheckData.check_passed ? '✅ Precheck 通过' : '⚠️ Precheck 发现问题'}
                     </AlertTitle>
                     <AlertDescription>
-                      健康: {precheckData.healthy_count}, 异常: {precheckData.unhealthy_count}, 错误: {precheckData.error_count}
+                      总计: {precheckData.total_hcas} | 健康: {precheckData.healthy_count} | 异常: {precheckData.unhealthy_count} | 错误: {precheckData.error_count}
                     </AlertDescription>
                   </Box>
                 </Alert>
+
+                {/* 详细结果表格 */}
+                {precheckData.results && precheckData.results.length > 0 && (
+                  <Box overflowX="auto">
+                    <Table variant="simple" size="sm">
+                      <Thead>
+                        <Tr>
+                          <Th>主机名</Th>
+                          <Th>HCA</Th>
+                          <Th>物理状态</Th>
+                          <Th>端口状态</Th>
+                          <Th>速度</Th>
+                          <Th>固件版本</Th>
+                          <Th>板卡ID</Th>
+                          <Th>状态</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {precheckData.results.map((result, index) => (
+                          <Tr key={index} bg={result.error ? 'red.50' : result.is_healthy ? 'green.50' : 'yellow.50'}>
+                            <Td>{result.hostname}</Td>
+                            <Td>{result.hca}</Td>
+                            <Td>
+                              <Badge colorScheme={result.phys_state === 'LinkUp' ? 'green' : 'red'}>
+                                {result.phys_state || 'N/A'}
+                              </Badge>
+                            </Td>
+                            <Td>
+                              <Badge colorScheme={result.state === 'ACTIVE' ? 'green' : 'yellow'}>
+                                {result.state || 'N/A'}
+                              </Badge>
+                            </Td>
+                            <Td>
+                              <Text fontWeight={precheckData.all_speeds_same ? 'normal' : 'bold'} 
+                                    color={precheckData.all_speeds_same ? 'inherit' : 'orange.600'}>
+                                {result.speed || 'N/A'}
+                              </Text>
+                            </Td>
+                            <Td fontSize="xs">{result.fw_ver || 'N/A'}</Td>
+                            <Td fontSize="xs">{result.board_id || 'N/A'}</Td>
+                            <Td>
+                              {result.error ? (
+                                <Badge colorScheme="red">ERROR</Badge>
+                              ) : result.is_healthy ? (
+                                <Badge colorScheme="green">健康</Badge>
+                              ) : (
+                                <Badge colorScheme="yellow">异常</Badge>
+                              )}
+                            </Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </Box>
+                )}
+
+                {/* 错误信息 */}
+                {precheckData.results && precheckData.results.some(r => r.error) && (
+                  <Box>
+                    <Text fontWeight="bold" mb={2}>错误详情:</Text>
+                    {precheckData.results
+                      .filter(r => r.error)
+                      .map((result, index) => (
+                        <Text key={index} color="red.600" fontSize="sm">
+                          • {result.hostname} - {result.hca}: {result.error}
+                        </Text>
+                      ))}
+                  </Box>
+                )}
               </VStack>
             </CardBody>
           </Card>
