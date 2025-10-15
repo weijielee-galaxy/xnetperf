@@ -24,6 +24,14 @@ import {
   Tr,
   Th,
   Td,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
 } from '@chakra-ui/react'
 import { CheckCircleIcon, WarningIcon, TimeIcon } from '@chakra-ui/icons'
 import ProbeResults from '../components/ProbeResults'
@@ -34,6 +42,7 @@ import {
   probeTest,
   collectReports,
   getReport,
+  fetchConfig,
 } from '../api'
 
 const STEPS = {
@@ -67,6 +76,8 @@ function TrafficTestPage({ configs }) {
   const [reportData, setReportData] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [isRunning, setIsRunning] = useState(false)
+  const [configPreviewData, setConfigPreviewData] = useState(null)
+  const { isOpen: isPreviewOpen, onOpen: onPreviewOpen, onClose: onPreviewClose } = useDisclosure()
   const toast = useToast()
 
   // 重置所有状态
@@ -78,6 +89,32 @@ function TrafficTestPage({ configs }) {
     setReportData(null)
     setErrorMessage('')
     setIsRunning(false)
+  }
+
+  // 预览配置
+  const handlePreviewConfig = async () => {
+    if (!selectedConfig) {
+      toast({
+        title: '请先选择配置',
+        description: '需要选择一个配置文件才能预览',
+        status: 'warning',
+        duration: 3000,
+      })
+      return
+    }
+
+    try {
+      const data = await fetchConfig(selectedConfig)
+      setConfigPreviewData(data)
+      onPreviewOpen()
+    } catch (error) {
+      toast({
+        title: '预览失败',
+        description: error.message,
+        status: 'error',
+        duration: 3000,
+      })
+    }
   }
 
   // 更新步骤状态
@@ -427,6 +464,14 @@ function TrafficTestPage({ configs }) {
                 </Select>
 
                 <Button
+                  variant="outline"
+                  onClick={handlePreviewConfig}
+                  isDisabled={!selectedConfig || isRunning}
+                >
+                  预览配置
+                </Button>
+
+                <Button
                   colorScheme="blue"
                   onClick={executeWorkflow}
                   isLoading={isRunning}
@@ -643,7 +688,7 @@ function TrafficTestPage({ configs }) {
                               </Badge>
                             </Td>
                             <Td>
-                              <Badge colorScheme={result.state === 'ACTIVE' ? 'green' : 'yellow'}>
+                              <Badge colorScheme={result.state === 'ACTIVE' ? 'green' : 'red'}>
                                 {result.state || 'N/A'}
                               </Badge>
                             </Td>
@@ -715,6 +760,170 @@ function TrafficTestPage({ configs }) {
           </Card>
         )}
       </VStack>
+
+      {/* 配置预览 Modal */}
+      <Modal isOpen={isPreviewOpen} onClose={onPreviewClose} size="4xl" scrollBehavior="inside">
+        <ModalOverlay />
+        <ModalContent maxH="80vh">
+          <ModalHeader>配置预览 - {selectedConfig}</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            {configPreviewData && (
+              <VStack spacing={4} align="stretch">
+                {/* 基础配置 */}
+                <Box>
+                  <Heading size="sm" mb={3} color="blue.600">基础配置</Heading>
+                  <VStack spacing={2} align="stretch" bg="gray.50" p={4} borderRadius="md">
+                    <HStack>
+                      <Text fontWeight="medium" minW="150px">流类型:</Text>
+                      <Badge colorScheme="blue">{configPreviewData.stream_type}</Badge>
+                    </HStack>
+                    <HStack>
+                      <Text fontWeight="medium" minW="150px">起始端口:</Text>
+                      <Text>{configPreviewData.start_port}</Text>
+                    </HStack>
+                    <HStack>
+                      <Text fontWeight="medium" minW="150px">理论速度:</Text>
+                      <Text>{configPreviewData.speed} Gbps</Text>
+                    </HStack>
+                    <HStack>
+                      <Text fontWeight="medium" minW="150px">测试时长:</Text>
+                      <Text>{configPreviewData.run?.duration_seconds || 10} 秒</Text>
+                    </HStack>
+                  </VStack>
+                </Box>
+
+                {/* 服务端配置 */}
+                <Box>
+                  <Heading size="sm" mb={3} color="green.600">服务端配置</Heading>
+                  <VStack spacing={2} align="stretch" bg="green.50" p={4} borderRadius="md">
+                    <Box>
+                      <Text fontWeight="medium" mb={2}>主机列表:</Text>
+                      <HStack wrap="wrap" spacing={2}>
+                        {configPreviewData.server?.hostname?.map((host, index) => (
+                          <Badge key={index} colorScheme="green" variant="outline">
+                            {host}
+                          </Badge>
+                        )) || <Text color="gray.500">未配置</Text>}
+                      </HStack>
+                    </Box>
+                    <Box>
+                      <Text fontWeight="medium" mb={2}>HCA 设备:</Text>
+                      <HStack wrap="wrap" spacing={2}>
+                        {configPreviewData.server?.hca?.map((hca, index) => (
+                          <Badge key={index} colorScheme="green" variant="solid">
+                            {hca}
+                          </Badge>
+                        )) || <Text color="gray.500">未配置</Text>}
+                      </HStack>
+                    </Box>
+                  </VStack>
+                </Box>
+
+                {/* 客户端配置 */}
+                <Box>
+                  <Heading size="sm" mb={3} color="orange.600">客户端配置</Heading>
+                  <VStack spacing={2} align="stretch" bg="orange.50" p={4} borderRadius="md">
+                    <Box>
+                      <Text fontWeight="medium" mb={2}>主机列表:</Text>
+                      <HStack wrap="wrap" spacing={2}>
+                        {configPreviewData.client?.hostname?.map((host, index) => (
+                          <Badge key={index} colorScheme="orange" variant="outline">
+                            {host}
+                          </Badge>
+                        )) || <Text color="gray.500">未配置</Text>}
+                      </HStack>
+                    </Box>
+                    <Box>
+                      <Text fontWeight="medium" mb={2}>HCA 设备:</Text>
+                      <HStack wrap="wrap" spacing={2}>
+                        {configPreviewData.client?.hca?.map((hca, index) => (
+                          <Badge key={index} colorScheme="orange" variant="solid">
+                            {hca}
+                          </Badge>
+                        )) || <Text color="gray.500">未配置</Text>}
+                      </HStack>
+                    </Box>
+                  </VStack>
+                </Box>
+
+                {/* 高级配置 */}
+                <Box>
+                  <Heading size="sm" mb={3} color="purple.600">高级配置</Heading>
+                  <VStack spacing={2} align="stretch" bg="purple.50" p={4} borderRadius="md">
+                    <HStack>
+                      <Text fontWeight="medium" minW="150px">QP 数量:</Text>
+                      <Text>{configPreviewData.qp_num || 1}</Text>
+                    </HStack>
+                    <HStack>
+                      <Text fontWeight="medium" minW="150px">消息大小:</Text>
+                      <Text>{configPreviewData.message_size_bytes || 65536} 字节</Text>
+                    </HStack>
+                    <HStack>
+                      <Text fontWeight="medium" minW="150px">RDMA CM:</Text>
+                      <Badge colorScheme={configPreviewData.rdma_cm ? 'green' : 'gray'}>
+                        {configPreviewData.rdma_cm ? '启用' : '禁用'}
+                      </Badge>
+                    </HStack>
+                    <HStack>
+                      <Text fontWeight="medium" minW="150px">生成报告:</Text>
+                      <Badge colorScheme={configPreviewData.report?.enable ? 'green' : 'gray'}>
+                        {configPreviewData.report?.enable ? '启用' : '禁用'}
+                      </Badge>
+                    </HStack>
+                    {configPreviewData.report?.enable && (
+                      <HStack>
+                        <Text fontWeight="medium" minW="150px">报告目录:</Text>
+                        <Text fontFamily="mono" fontSize="sm" bg="gray.100" px={2} py={1} borderRadius="sm">
+                          {configPreviewData.report?.dir || '/tmp'}
+                        </Text>
+                      </HStack>
+                    )}
+                  </VStack>
+                </Box>
+
+                {/* 统计信息 */}
+                <Box>
+                  <Heading size="sm" mb={3} color="gray.600">测试规模</Heading>
+                  <HStack spacing={8} bg="gray.100" p={4} borderRadius="md">
+                    <VStack>
+                      <Text fontSize="2xl" fontWeight="bold" color="green.600">
+                        {configPreviewData.server?.hostname?.length || 0}
+                      </Text>
+                      <Text fontSize="sm" color="gray.600">服务端主机</Text>
+                    </VStack>
+                    <VStack>
+                      <Text fontSize="2xl" fontWeight="bold" color="orange.600">
+                        {configPreviewData.client?.hostname?.length || 0}
+                      </Text>
+                      <Text fontSize="sm" color="gray.600">客户端主机</Text>
+                    </VStack>
+                    <VStack>
+                      <Text fontSize="2xl" fontWeight="bold" color="blue.600">
+                        {((configPreviewData.server?.hostname?.length || 0) * (configPreviewData.server?.hca?.length || 0)) +
+                         ((configPreviewData.client?.hostname?.length || 0) * (configPreviewData.client?.hca?.length || 0))}
+                      </Text>
+                      <Text fontSize="sm" color="gray.600">总 HCA 数量</Text>
+                    </VStack>
+                    {configPreviewData.stream_type === 'fullmesh' && (
+                      <VStack>
+                        <Text fontSize="2xl" fontWeight="bold" color="purple.600">
+                          {((configPreviewData.client?.hostname?.length || 0) * (configPreviewData.client?.hca?.length || 0)) * 
+                           ((configPreviewData.server?.hostname?.length || 0) * (configPreviewData.server?.hca?.length || 0))}
+                        </Text>
+                        <Text fontSize="sm" color="gray.600">预计连接数</Text>
+                      </VStack>
+                    )}
+                  </HStack>
+                </Box>
+              </VStack>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button onClick={onPreviewClose}>关闭</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   )
 }

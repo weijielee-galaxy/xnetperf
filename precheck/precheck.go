@@ -157,7 +157,7 @@ func checkAllHCAs(checkItems []struct {
 				mu.Unlock()
 				return
 			}
-			result.PhysState = strings.TrimSpace(physState)
+			result.PhysState = strings.TrimSpace(cleanStateString(physState))
 
 			// 检查逻辑状态
 			state, err := getHCAInfo(hostname, hca, "state")
@@ -169,7 +169,7 @@ func checkAllHCAs(checkItems []struct {
 				mu.Unlock()
 				return
 			}
-			result.State = strings.TrimSpace(state)
+			result.State = strings.TrimSpace(cleanStateString(state))
 
 			// v0.0.2: 检查 speed
 			speed, err := getHCAInfo(hostname, hca, "rate")
@@ -215,6 +215,20 @@ func checkAllHCAs(checkItems []struct {
 
 	wg.Wait()
 	return results
+}
+
+// cleanStateString 去掉状态字符串前面的数字和冒号，只保留有意义的文本
+// 例如: "5: LinkUp" -> "LinkUp", "4: ACTIVE" -> "ACTIVE"
+func cleanStateString(stateStr string) string {
+	// 查找冒号的位置
+	colonIndex := strings.Index(stateStr, ":")
+	if colonIndex == -1 {
+		// 如果没有冒号，返回原字符串
+		return stateStr
+	}
+
+	// 返回冒号后面的内容，去掉前后空格
+	return strings.TrimSpace(stateStr[colonIndex+1:])
 }
 
 func getHCAInfo(hostname, hca, infoType string) (string, error) {
