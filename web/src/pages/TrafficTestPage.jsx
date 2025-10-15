@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Box,
   VStack,
@@ -78,7 +78,18 @@ function TrafficTestPage({ configs }) {
   const [isRunning, setIsRunning] = useState(false)
   const [configPreviewData, setConfigPreviewData] = useState(null)
   const { isOpen: isPreviewOpen, onOpen: onPreviewOpen, onClose: onPreviewClose } = useDisclosure()
+  const stepRefs = useRef({})
   const toast = useToast()
+
+  // 自动滚动到当前步骤
+  useEffect(() => {
+    if (currentStep !== STEPS.IDLE && stepRefs.current[currentStep]) {
+      stepRefs.current[currentStep].scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      })
+    }
+  }, [currentStep])
 
   // 重置所有状态
   const resetStates = () => {
@@ -435,6 +446,169 @@ function TrafficTestPage({ configs }) {
     }
   }
 
+  // 渲染步骤详细内容
+  const renderStepContent = (step, status) => {
+    if (!status || status === 'running') {
+      return null
+    }
+
+    switch (step) {
+      case STEPS.PRECHECK:
+        if (precheckData) {
+          return (
+            <Box mt={4}>
+              <Divider mb={4} />
+              {/* 汇总信息 */}
+              <Alert
+                status={precheckData.check_passed ? 'success' : 'warning'}
+                variant="subtle"
+                mb={4}
+              >
+                <AlertIcon />
+                <Box flex="1">
+                  <AlertTitle>
+                    {precheckData.check_passed ? '✅ Precheck 通过' : '⚠️ Precheck 发现问题'}
+                  </AlertTitle>
+                  <AlertDescription>
+                    总计: {precheckData.total_hcas} | 健康: {precheckData.healthy_count} | 异常: {precheckData.unhealthy_count} | 错误: {precheckData.error_count}
+                  </AlertDescription>
+                </Box>
+              </Alert>
+
+              {/* 详细结果表格 */}
+              {precheckData.results && precheckData.results.length > 0 && (
+                <Box overflowX="auto">
+                  <Table variant="simple" size="sm">
+                    <Thead>
+                      <Tr>
+                        <Th>主机名</Th>
+                        <Th>HCA</Th>
+                        <Th>物理状态</Th>
+                        <Th>端口状态</Th>
+                        <Th>速度</Th>
+                        <Th>固件版本</Th>
+                        <Th>板卡ID</Th>
+                        <Th>状态</Th>
+                      </Tr>
+                    </Thead>
+                    <Tbody>
+                      {precheckData.results.map((result, index) => (
+                        <Tr key={index} bg={result.error ? 'red.50' : result.is_healthy ? 'green.50' : 'yellow.50'}>
+                          <Td>{result.hostname}</Td>
+                          <Td>{result.hca}</Td>
+                          <Td>
+                            <Badge colorScheme={result.phys_state === 'LinkUp' ? 'green' : 'red'}>
+                              {result.phys_state || 'N/A'}
+                            </Badge>
+                          </Td>
+                          <Td>
+                            <Badge colorScheme={result.state === 'ACTIVE' ? 'green' : 'red'}>
+                              {result.state || 'N/A'}
+                            </Badge>
+                          </Td>
+                          <Td>
+                            <Text fontWeight={precheckData.all_speeds_same ? 'normal' : 'bold'} 
+                                  color={precheckData.all_speeds_same ? 'inherit' : 'orange.600'}>
+                              {result.speed || 'N/A'}
+                            </Text>
+                          </Td>
+                          <Td fontSize="xs">{result.fw_ver || 'N/A'}</Td>
+                          <Td fontSize="xs">{result.board_id || 'N/A'}</Td>
+                          <Td>
+                            {result.error ? (
+                              <Badge colorScheme="red">ERROR</Badge>
+                            ) : result.is_healthy ? (
+                              <Badge colorScheme="green">健康</Badge>
+                            ) : (
+                              <Badge colorScheme="yellow">异常</Badge>
+                            )}
+                          </Td>
+                        </Tr>
+                      ))}
+                    </Tbody>
+                  </Table>
+                </Box>
+              )}
+
+              {/* 错误信息 */}
+              {precheckData.results && precheckData.results.some(r => r.error) && (
+                <Box mt={4}>
+                  <Text fontWeight="bold" mb={2}>错误详情:</Text>
+                  {precheckData.results
+                    .filter(r => r.error)
+                    .map((result, index) => (
+                      <Text key={index} color="red.600" fontSize="sm">
+                        • {result.hostname} - {result.hca}: {result.error}
+                      </Text>
+                    ))}
+                </Box>
+              )}
+            </Box>
+          )
+        }
+        break
+
+      case STEPS.RUN:
+        if (status === 'success') {
+          return (
+            <Box mt={4}>
+              <Divider mb={4} />
+              <Alert status="success" variant="subtle">
+                <AlertIcon />
+                <AlertDescription>
+                  测试脚本已成功分发到所有节点并启动
+                </AlertDescription>
+              </Alert>
+            </Box>
+          )
+        }
+        break
+
+      case STEPS.PROBE:
+        if (probeData) {
+          return (
+            <Box mt={4}>
+              <Divider mb={4} />
+              <ProbeResults data={probeData} />
+            </Box>
+          )
+        }
+        break
+
+      case STEPS.COLLECT:
+        if (status === 'success') {
+          return (
+            <Box mt={4}>
+              <Divider mb={4} />
+              <Alert status="success" variant="subtle">
+                <AlertIcon />
+                <AlertDescription>
+                  测试结果已成功从所有节点收集
+                </AlertDescription>
+              </Alert>
+            </Box>
+          )
+        }
+        break
+
+      case STEPS.REPORT:
+        if (reportData) {
+          return (
+            <Box mt={4}>
+              <Divider mb={4} />
+              <ReportResults data={reportData} />
+            </Box>
+          )
+        }
+        break
+
+      default:
+        break
+    }
+
+    return null
+  }
+
   return (
     <Box p={6} h="100%" overflowY="auto">
       <VStack spacing={6} align="stretch">
@@ -550,7 +724,11 @@ function TrafficTestPage({ configs }) {
                       const isActive = currentStep === step
                       
                       return (
-                        <Box key={step} position="relative">
+                        <Box 
+                          key={step} 
+                          position="relative"
+                          ref={el => stepRefs.current[step] = el}
+                        >
                           {/* 时间线节点圆圈 */}
                           <Box
                             position="absolute"
@@ -615,6 +793,9 @@ function TrafficTestPage({ configs }) {
                                 {stepStatus[step].message}
                               </Text>
                             )}
+
+                            {/* 嵌入每个步骤的详细结果 */}
+                            {renderStepContent(step, status)}
                           </Box>
                         </Box>
                       )
@@ -635,129 +816,6 @@ function TrafficTestPage({ configs }) {
               <AlertDescription>{errorMessage}</AlertDescription>
             </Box>
           </Alert>
-        )}
-
-        {/* PreCheck 结果 */}
-        {precheckData && (
-          <Card>
-            <CardBody>
-              <VStack spacing={4} align="stretch">
-                <Heading size="sm">PreCheck 检查结果</Heading>
-                <Divider />
-                
-                {/* 汇总信息 */}
-                <Alert
-                  status={precheckData.check_passed ? 'success' : 'warning'}
-                  variant="subtle"
-                >
-                  <AlertIcon />
-                  <Box flex="1">
-                    <AlertTitle>
-                      {precheckData.check_passed ? '✅ Precheck 通过' : '⚠️ Precheck 发现问题'}
-                    </AlertTitle>
-                    <AlertDescription>
-                      总计: {precheckData.total_hcas} | 健康: {precheckData.healthy_count} | 异常: {precheckData.unhealthy_count} | 错误: {precheckData.error_count}
-                    </AlertDescription>
-                  </Box>
-                </Alert>
-
-                {/* 详细结果表格 */}
-                {precheckData.results && precheckData.results.length > 0 && (
-                  <Box overflowX="auto">
-                    <Table variant="simple" size="sm">
-                      <Thead>
-                        <Tr>
-                          <Th>主机名</Th>
-                          <Th>HCA</Th>
-                          <Th>物理状态</Th>
-                          <Th>端口状态</Th>
-                          <Th>速度</Th>
-                          <Th>固件版本</Th>
-                          <Th>板卡ID</Th>
-                          <Th>状态</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {precheckData.results.map((result, index) => (
-                          <Tr key={index} bg={result.error ? 'red.50' : result.is_healthy ? 'green.50' : 'yellow.50'}>
-                            <Td>{result.hostname}</Td>
-                            <Td>{result.hca}</Td>
-                            <Td>
-                              <Badge colorScheme={result.phys_state === 'LinkUp' ? 'green' : 'red'}>
-                                {result.phys_state || 'N/A'}
-                              </Badge>
-                            </Td>
-                            <Td>
-                              <Badge colorScheme={result.state === 'ACTIVE' ? 'green' : 'red'}>
-                                {result.state || 'N/A'}
-                              </Badge>
-                            </Td>
-                            <Td>
-                              <Text fontWeight={precheckData.all_speeds_same ? 'normal' : 'bold'} 
-                                    color={precheckData.all_speeds_same ? 'inherit' : 'orange.600'}>
-                                {result.speed || 'N/A'}
-                              </Text>
-                            </Td>
-                            <Td fontSize="xs">{result.fw_ver || 'N/A'}</Td>
-                            <Td fontSize="xs">{result.board_id || 'N/A'}</Td>
-                            <Td>
-                              {result.error ? (
-                                <Badge colorScheme="red">ERROR</Badge>
-                              ) : result.is_healthy ? (
-                                <Badge colorScheme="green">健康</Badge>
-                              ) : (
-                                <Badge colorScheme="yellow">异常</Badge>
-                              )}
-                            </Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>
-                  </Box>
-                )}
-
-                {/* 错误信息 */}
-                {precheckData.results && precheckData.results.some(r => r.error) && (
-                  <Box>
-                    <Text fontWeight="bold" mb={2}>错误详情:</Text>
-                    {precheckData.results
-                      .filter(r => r.error)
-                      .map((result, index) => (
-                        <Text key={index} color="red.600" fontSize="sm">
-                          • {result.hostname} - {result.hca}: {result.error}
-                        </Text>
-                      ))}
-                  </Box>
-                )}
-              </VStack>
-            </CardBody>
-          </Card>
-        )}
-
-        {/* Probe 结果 */}
-        {probeData && (
-          <Card>
-            <CardBody>
-              <VStack spacing={4} align="stretch">
-                <Heading size="sm">进程探测结果</Heading>
-                <Divider />
-                <ProbeResults data={probeData} />
-              </VStack>
-            </CardBody>
-          </Card>
-        )}
-
-        {/* Report 结果 */}
-        {reportData && (
-          <Card>
-            <CardBody>
-              <VStack spacing={4} align="stretch">
-                <Heading size="sm">性能测试报告</Heading>
-                <Divider />
-                <ReportResults data={reportData} />
-              </VStack>
-            </CardBody>
-          </Card>
         )}
       </VStack>
 
