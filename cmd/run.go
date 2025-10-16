@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"sync"
 	"xnetperf/config"
 	"xnetperf/stream"
@@ -78,7 +77,7 @@ func cleanupRemoteReportFiles(cfg *config.Config) {
 
 			// 删除远程主机上属于当前主机的JSON报告文件（按主机名安全匹配）
 			rmCmd := fmt.Sprintf("rm -f %s/*%s*.json", cfg.Report.Dir, host)
-			cmd := exec.Command("ssh", host, rmCmd)
+			cmd := buildSSHCommand(host, rmCmd, cfg.SSH.PrivateKey)
 
 			output, err := cmd.CombinedOutput()
 			if err != nil {

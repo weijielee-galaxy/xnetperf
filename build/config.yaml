@@ -15,6 +15,9 @@ run:
   infinitely: true
   duration_seconds: 10
 
+ssh:
+  private_key: "~/.ssh/id_rsa"
+
 server:
   hostname:
   - "cetus-g88-094"

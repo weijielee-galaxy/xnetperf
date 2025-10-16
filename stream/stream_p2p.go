@@ -3,7 +3,6 @@ package stream
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"xnetperf/config"
 )
@@ -60,14 +59,14 @@ func GenerateP2PScripts(cfg *config.Config) error {
 		clientHost := cfg.Client.Hostname[hostIndex]
 
 		// Get server IP
-		serverIP, err := getHostIP(serverHost)
+		serverIP, err := getHostIP(serverHost, cfg.SSH.PrivateKey)
 		if err != nil {
 			fmt.Printf("❌ Error getting IP for server %s: %v\n", serverHost, err)
 			// continue
 		}
 
 		// Get client IP
-		clientIP, err := getHostIP(clientHost)
+		clientIP, err := getHostIP(clientHost, cfg.SSH.PrivateKey)
 		if err != nil {
 			fmt.Printf("❌ Error getting IP for client %s: %v\n", clientHost, err)
 			// continue
@@ -120,6 +119,7 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 		RdmaCm(cfg.RdmaCm).
 		Report(cfg.Report.Enable).
 		OutputFileName(fmt.Sprintf("%s/report_%s_%s_%d.json", cfg.Report.Dir, serverHost, serverHca, port)).
+		SSHPrivateKey(cfg.SSH.PrivateKey).
 		ServerCommand()
 
 	// Generate client command (initiator)
@@ -136,6 +136,7 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 		RdmaCm(cfg.RdmaCm).
 		Report(cfg.Report.Enable).
 		OutputFileName(fmt.Sprintf("%s/report_%s_%s_%d.json", cfg.Report.Dir, clientHost, clientHca, port)).
+		SSHPrivateKey(cfg.SSH.PrivateKey).
 		ClientCommand()
 
 	// Write server script
@@ -154,9 +155,9 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 }
 
 // getHostIP retrieves the IP address of a host using bond0 interface
-func getHostIP(hostname string) (string, error) {
+func getHostIP(hostname string, sshKeyPath string) (string, error) {
 	command := "ip addr show bond0 | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1"
-	cmd := exec.Command("ssh", hostname, command)
+	cmd := buildSSHCommand(hostname, command, sshKeyPath)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

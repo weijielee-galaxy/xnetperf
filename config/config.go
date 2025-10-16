@@ -25,6 +25,7 @@ type Config struct {
 	RdmaCm             bool         `yaml:"rdma_cm" json:"rdma_cm"`
 	Report             Report       `yaml:"report" json:"report"`
 	Run                Run          `yaml:"run" json:"run"`
+	SSH                SSH          `yaml:"ssh" json:"ssh"`
 	Server             ServerConfig `yaml:"server" json:"server"`
 	Client             ClientConfig `yaml:"client" json:"client"`
 }
@@ -37,6 +38,10 @@ type Report struct {
 type Run struct {
 	Infinitely      bool `yaml:"infinitely" json:"infinitely"`
 	DurationSeconds int  `yaml:"duration_seconds" json:"duration_seconds"`
+}
+
+type SSH struct {
+	PrivateKey string `yaml:"private_key" json:"private_key"`
 }
 
 // ServerConfig holds the server-specific settings.
@@ -99,6 +104,9 @@ func NewDefaultConfig() *Config {
 			Infinitely:      false,
 			DurationSeconds: 10,
 		},
+		SSH: SSH{
+			PrivateKey: "~/.ssh/id_rsa",
+		},
 		Server: ServerConfig{
 			Hostname: []string{},
 			Hca:      []string{},
@@ -140,5 +148,9 @@ func (c *Config) ApplyDefaults() {
 	// Run defaults
 	if c.Run.DurationSeconds == 0 {
 		c.Run.DurationSeconds = 10
+	}
+	// SSH defaults
+	if c.SSH.PrivateKey == "" {
+		c.SSH.PrivateKey = "~/.ssh/id_rsa"
 	}
 }

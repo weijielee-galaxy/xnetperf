@@ -35,7 +35,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 		command := fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1", "bond0")
 
 		// 2. Create the command to be executed locally: ssh <hostname> "<command>"
-		cmd := exec.Command("ssh", Server, command)
+		cmd := buildSSHCommand(Server, command, cfg.SSH.PrivateKey)
 
 		// 3. Run the command and capture the combined output (stdout and stderr).
 		output, err := cmd.CombinedOutput()
@@ -75,6 +75,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 						RdmaCm(cfg.RdmaCm).
 						Report(cfg.Report.Enable).
 						OutputFileName(fmt.Sprintf("%s/report_s_%s_%s_%d.json", cfg.Report.Dir, Server, hcaServer, port)).
+						SSHPrivateKey(cfg.SSH.PrivateKey).
 						ServerCommand() // 服务器命令不需要目标IP
 
 					// 使用命令构建器创建客户端命令
@@ -89,6 +90,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 						RdmaCm(cfg.RdmaCm).
 						Report(cfg.Report.Enable).
 						OutputFileName(fmt.Sprintf("%s/report_c_%s_%s_%d.json", cfg.Report.Dir, allHost, hcaClient, port)).
+						SSHPrivateKey(cfg.SSH.PrivateKey).
 						ClientCommand() // 客户端命令有更长的睡眠时间
 
 					serverScriptContent.WriteString(serverCmd.String() + "\n")
@@ -114,7 +116,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 	}
 }
 
-func ClearPreviewScript(hosts []string) {
+func ClearPreviewScript(hosts []string, sshKeyPath string) {
 	var wg sync.WaitGroup
 
 	for _, host := range hosts {
@@ -131,7 +133,7 @@ func ClearPreviewScript(hosts []string) {
 			fmt.Printf("-> Sending command to %s...\n", hostname)
 
 			// Create the command: ssh <hostname> "killall ib_write_bw"
-			cmd := exec.Command("ssh", hostname, "killall ib_write_bw")
+			cmd := buildSSHCommand(hostname, "killall ib_write_bw", sshKeyPath)
 
 			// Run the command and capture the combined standard output and standard error.
 			output, err := cmd.CombinedOutput()
@@ -166,7 +168,7 @@ func DistributeAndRunScripts(cfg *config.Config) {
 	fmt.Println("Distributing and running scripts...")
 	allServerHostName := append(cfg.Server.Hostname, cfg.Client.Hostname...)
 	fmt.Println(allServerHostName)
-	ClearPreviewScript(allServerHostName)
+	ClearPreviewScript(allServerHostName, cfg.SSH.PrivateKey)
 
 	// 这里是分发和启动脚本的逻辑
 	fmt.Println("Distributing and running scripts...")

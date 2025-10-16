@@ -19,6 +19,7 @@ type IBWriteBWCommandBuilder struct {
 	background      bool
 	sleepTime       string
 	sshWrapper      bool
+	sshPrivateKey   string // SSH private key path
 	report          bool
 	outputFileName  string
 	bidirectional   bool // 新增双向测试参数
@@ -108,6 +109,12 @@ func (b *IBWriteBWCommandBuilder) SSHWrapper(enable bool) *IBWriteBWCommandBuild
 	return b
 }
 
+// SSHPrivateKey sets the SSH private key path
+func (b *IBWriteBWCommandBuilder) SSHPrivateKey(keyPath string) *IBWriteBWCommandBuilder {
+	b.sshPrivateKey = keyPath
+	return b
+}
+
 // Report sets whether to enable report generation
 func (b *IBWriteBWCommandBuilder) Report(enable bool) *IBWriteBWCommandBuilder {
 	b.report = enable
@@ -142,7 +149,11 @@ func (b *IBWriteBWCommandBuilder) String() string {
 	var cmd strings.Builder
 
 	if b.sshWrapper {
-		cmd.WriteString(fmt.Sprintf("ssh %s '", b.host))
+		if b.sshPrivateKey != "" {
+			cmd.WriteString(fmt.Sprintf("ssh -i %s %s '", b.sshPrivateKey, b.host))
+		} else {
+			cmd.WriteString(fmt.Sprintf("ssh %s '", b.host))
+		}
 	}
 
 	cmd.WriteString("ib_write_bw")

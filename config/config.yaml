@@ -15,6 +15,9 @@ run:
   infinitely: true # Whether to run the test infinitely, default is false
   duration_seconds: 10 # Duration of the test in seconds if not running infinitely, default is 10
 
+ssh:
+  private_key: "~/.ssh/id_rsa" # Path to the SSH private key for authentication, default is "~/.ssh/id_rsa"
+
 server:
   hostname:
   - "cetus-g88-094"
