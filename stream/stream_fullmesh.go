@@ -64,6 +64,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 						Device(hcaServer).
 						MessageSize(cfg.MessageSizeBytes).
 						Port(port).
+						QueuePairNum(cfg.QpNum).
 						RunInfinitely(cfg.Run.Infinitely).
 						DurationSeconds(cfg.Run.DurationSeconds).
 						RdmaCm(cfg.RdmaCm).
@@ -78,6 +79,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 						Device(hcaClient).
 						MessageSize(cfg.MessageSizeBytes).
 						Port(port).
+						QueuePairNum(cfg.QpNum).
 						TargetIP(strings.TrimSpace(string(output))).
 						RunInfinitely(cfg.Run.Infinitely).
 						DurationSeconds(cfg.Run.DurationSeconds).
