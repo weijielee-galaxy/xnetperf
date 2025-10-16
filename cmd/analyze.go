@@ -145,7 +145,9 @@ func collectReportData(reportsDir string) (map[string]map[string]*DeviceData, ma
 
 		isClient := strings.HasPrefix(filename, "report_c_")
 		hostname := parts[2]
-		device := parts[3] + "_" + parts[4] // Reconstruct device name like mlx5_0
+		// HCA device name is from parts[3] to the second-to-last part (before port number)
+		// This supports any HCA naming format: mlx5_0, mlx5_bond_0, mlx5_1_bond, etc.
+		device := strings.Join(parts[3:len(parts)-1], "_")
 
 		// Read and parse JSON file
 		content, err := os.ReadFile(path)
@@ -193,6 +195,60 @@ func collectReportData(reportsDir string) (map[string]map[string]*DeviceData, ma
 	return clientData, serverData, err
 }
 
+// calculateMaxDeviceNameLength 计算数据中最长的设备名称长度
+func calculateMaxDeviceNameLength(dataMap map[string]map[string]*DeviceData) int {
+	maxLen := 8 // 最小宽度为 "Device" 列标题长度
+	for _, devices := range dataMap {
+		for device := range devices {
+			if len(device) > maxLen {
+				maxLen = len(device)
+			}
+		}
+	}
+	return maxLen
+}
+
+// calculateMaxP2PDeviceNameLength 计算 P2P 数据中最长的设备名称长度
+func calculateMaxP2PDeviceNameLength(dataMap map[string]map[string]*P2PDeviceData) int {
+	maxLen := 8 // 最小宽度
+	for _, devices := range dataMap {
+		for device := range devices {
+			if len(device) > maxLen {
+				maxLen = len(device)
+			}
+		}
+	}
+	return maxLen
+}
+
+// displayClientTableHeader 显示客户端表格头部（动态列宽）
+func displayClientTableHeader(deviceWidth int) {
+	deviceDashes := strings.Repeat("─", deviceWidth)
+	fmt.Printf("┌─────────────────────┬─%s─┬─────────────┬──────────────┬─────────────────┬──────────┐\n", deviceDashes)
+	fmt.Printf("│ Hostname            │ %-*s │ TX (Gbps)   │ SPEC (Gbps)  │ DELTA           │ Status   │\n", deviceWidth, "Device")
+	fmt.Printf("├─────────────────────┼─%s─┼─────────────┼──────────────┼─────────────────┼──────────┤\n", deviceDashes)
+}
+
+// displayClientTableFooter 显示客户端表格尾部（动态列宽）
+func displayClientTableFooter(deviceWidth int) {
+	deviceDashes := strings.Repeat("─", deviceWidth)
+	fmt.Printf("└─────────────────────┴─%s─┴─────────────┴──────────────┴─────────────────┴──────────┘\n", deviceDashes)
+}
+
+// displayServerTableHeader 显示服务端表格头部（动态列宽）
+func displayServerTableHeader(deviceWidth int) {
+	deviceDashes := strings.Repeat("─", deviceWidth)
+	fmt.Printf("┌─────────────────────┬─%s─┬─────────────┐\n", deviceDashes)
+	fmt.Printf("│ Hostname            │ %-*s │ RX (Gbps)   │\n", deviceWidth, "Device")
+	fmt.Printf("├─────────────────────┼─%s─┼─────────────┤\n", deviceDashes)
+}
+
+// displayServerTableFooter 显示服务端表格尾部（动态列宽）
+func displayServerTableFooter(deviceWidth int) {
+	deviceDashes := strings.Repeat("─", deviceWidth)
+	fmt.Printf("└─────────────────────┴─%s─┴─────────────┘\n", deviceDashes)
+}
+
 func displayResults(clientData, serverData map[string]map[string]*DeviceData, specSpeed float64) {
 	fmt.Println("=== Network Performance Analysis ===")
 
@@ -204,14 +260,22 @@ func displayResults(clientData, serverData map[string]map[string]*DeviceData, sp
 		theoreticalBWPerClient = totalServerBW / float64(clientCount)
 	}
 
+	// 计算最大设备名称长度（客户端和服务端数据合并）
+	maxDeviceLen := calculateMaxDeviceNameLength(clientData)
+	serverMaxDeviceLen := calculateMaxDeviceNameLength(serverData)
+	if serverMaxDeviceLen > maxDeviceLen {
+		maxDeviceLen = serverMaxDeviceLen
+	}
+	if maxDeviceLen < 8 {
+		maxDeviceLen = 8 // 最小宽度
+	}
+
 	// Display client data with enhanced table
 	fmt.Println("CLIENT DATA (TX)")
-	fmt.Println("┌─────────────────────┬──────────┬─────────────┬──────────────┬─────────────────┬──────────┐")
-	fmt.Println("│ Hostname            │ Device   │ TX (Gbps)   │ SPEC (Gbps)  │ DELTA           │ Status   │")
-	fmt.Println("├─────────────────────┼──────────┼─────────────┼──────────────┼─────────────────┼──────────┤")
+	displayClientTableHeader(maxDeviceLen)
 
-	displayEnhancedClientTable(clientData, theoreticalBWPerClient)
-	fmt.Println("└─────────────────────┴──────────┴─────────────┴──────────────┴─────────────────┴──────────┘")
+	displayEnhancedClientTable(clientData, theoreticalBWPerClient, maxDeviceLen)
+	displayClientTableFooter(maxDeviceLen)
 
 	fmt.Printf("\nTheoretical BW per client: %.2f Gbps (Total server BW: %.2f Gbps ÷ %d clients)\n",
 		theoreticalBWPerClient, totalServerBW, clientCount)
@@ -220,21 +284,21 @@ func displayResults(clientData, serverData map[string]map[string]*DeviceData, sp
 
 	// Display server data
 	fmt.Println("SERVER DATA (RX)")
-	fmt.Println("┌─────────────────────┬──────────┬─────────────┐")
-	fmt.Println("│ Hostname            │ Device   │ RX (Gbps)   │")
-	fmt.Println("├─────────────────────┼──────────┼─────────────┤")
+	displayServerTableHeader(maxDeviceLen)
 
-	displayDataTable(serverData, true)
-	fmt.Println("└─────────────────────┴──────────┴─────────────┘")
+	displayDataTable(serverData, true, maxDeviceLen)
+	displayServerTableFooter(maxDeviceLen)
 }
 
-func displayDataTable(dataMap map[string]map[string]*DeviceData, isServer bool) {
+func displayDataTable(dataMap map[string]map[string]*DeviceData, isServer bool, deviceWidth int) {
 	// Get sorted hostnames
 	var hostnames []string
 	for hostname := range dataMap {
 		hostnames = append(hostnames, hostname)
 	}
 	sort.Strings(hostnames)
+
+	deviceDashes := strings.Repeat("─", deviceWidth)
 
 	for i, hostname := range hostnames {
 		devices := dataMap[hostname]
@@ -256,13 +320,13 @@ func displayDataTable(dataMap map[string]map[string]*DeviceData, isServer bool) 
 				hostnameStr = hostname
 			}
 
-			fmt.Printf("│ %-19s │ %-8s │ %11.2f │\n",
-				hostnameStr, device, total)
+			fmt.Printf("│ %-19s │ %-*s │ %11.2f │\n",
+				hostnameStr, deviceWidth, device, total)
 		}
 
 		// Add separator between different hostnames (except for the last one)
 		if i < len(hostnames)-1 && len(dataMap[hostname]) > 0 {
-			fmt.Println("├─────────────────────┼──────────┼─────────────┤")
+			fmt.Printf("├─────────────────────┼─%s─┼─────────────┤\n", deviceDashes)
 		}
 	}
 }
@@ -357,13 +421,15 @@ func calculateClientCount(clientData map[string]map[string]*DeviceData) int {
 }
 
 // displayEnhancedClientTable 显示增强的客户端表格
-func displayEnhancedClientTable(clientData map[string]map[string]*DeviceData, theoreticalBW float64) {
+func displayEnhancedClientTable(clientData map[string]map[string]*DeviceData, theoreticalBW float64, deviceWidth int) {
 	// Get sorted hostnames
 	var hostnames []string
 	for hostname := range clientData {
 		hostnames = append(hostnames, hostname)
 	}
 	sort.Strings(hostnames)
+
+	deviceDashes := strings.Repeat("─", deviceWidth)
 
 	for i, hostname := range hostnames {
 		devices := clientData[hostname]
@@ -399,13 +465,13 @@ func displayEnhancedClientTable(clientData map[string]map[string]*DeviceData, th
 				hostnameStr = hostname
 			}
 
-			fmt.Printf("│ %-19s │ %-8s │ %11.2f │ %12.2f │ %15s │ %-8s │\n",
-				hostnameStr, device, actualBW, theoreticalBW, deltaStr, status)
+			fmt.Printf("│ %-19s │ %-*s │ %11.2f │ %12.2f │ %15s │ %-8s │\n",
+				hostnameStr, deviceWidth, device, actualBW, theoreticalBW, deltaStr, status)
 		}
 
 		// Add separator between different hostnames (except for the last one)
 		if i < len(hostnames)-1 && len(clientData[hostname]) > 0 {
-			fmt.Println("├─────────────────────┼──────────┼─────────────┼──────────────┼─────────────────┼──────────┤")
+			fmt.Printf("├─────────────────────┼─%s─┼─────────────┼──────────────┼─────────────────┼──────────┤\n", deviceDashes)
 		}
 	}
 }
@@ -561,7 +627,9 @@ func collectP2PReportData(reportsDir string) (map[string]map[string]*P2PDeviceDa
 		}
 
 		hostname := parts[1]
-		device := parts[2] + "_" + parts[3] // Reconstruct device name like mlx5_0
+		// HCA device name is from parts[2] to the second-to-last part (before port number)
+		// This supports any HCA naming format: mlx5_0, mlx5_bond_0, mlx5_1_bond, etc.
+		device := strings.Join(parts[2:len(parts)-1], "_")
 
 		// Read and parse JSON file
 		// content, err := os.ReadFile(path)
@@ -608,9 +676,18 @@ func collectP2PReportData(reportsDir string) (map[string]map[string]*P2PDeviceDa
 // displayP2PResults displays results for P2P mode
 func displayP2PResults(p2pData map[string]map[string]*P2PDeviceData) {
 	fmt.Println("=== P2P Performance Analysis ===")
-	fmt.Println("┌─────────────────────┬──────────┬─────────────┐")
-	fmt.Println("│ Hostname            │ Device   │ Speed (Gbps)│")
-	fmt.Println("├─────────────────────┼──────────┼─────────────┤")
+
+	// 计算最大设备名称长度
+	maxDeviceLen := calculateMaxP2PDeviceNameLength(p2pData)
+	if maxDeviceLen < 8 {
+		maxDeviceLen = 8
+	}
+
+	// 显示表格头部
+	deviceDashes := strings.Repeat("─", maxDeviceLen)
+	fmt.Printf("┌─────────────────────┬─%s─┬─────────────┐\n", deviceDashes)
+	fmt.Printf("│ Hostname            │ %-*s │ Speed (Gbps)│\n", maxDeviceLen, "Device")
+	fmt.Printf("├─────────────────────┼─%s─┼─────────────┤\n", deviceDashes)
 
 	// Get sorted hostnames
 	var hostnames []string
@@ -639,17 +716,18 @@ func displayP2PResults(p2pData map[string]map[string]*P2PDeviceData) {
 				hostnameStr = hostname
 			}
 
-			fmt.Printf("│ %-19s │ %-8s │ %11.2f │\n",
-				hostnameStr, device, avgSpeed)
+			fmt.Printf("│ %-19s │ %-*s │ %11.2f │\n",
+				hostnameStr, maxDeviceLen, device, avgSpeed)
 
 			// Add separator between different hosts (except for the last host)
 			if j == len(deviceNames)-1 && i < len(hostnames)-1 {
-				fmt.Println("├─────────────────────┼──────────┼─────────────┤")
+				fmt.Printf("├─────────────────────┼─%s─┼─────────────┤\n", deviceDashes)
 			}
 		}
 	}
 
-	fmt.Println("└─────────────────────┴──────────┴─────────────┘")
+	// 显示表格尾部
+	fmt.Printf("└─────────────────────┴─%s─┴─────────────┘\n", deviceDashes)
 
 	// Calculate and display summary
 	totalPairs := 0

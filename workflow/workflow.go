@@ -493,7 +493,9 @@ func collectTraditionalReportData(reportsDir string) (map[string]map[string]*dev
 
 		isClient := strings.HasPrefix(filename, "report_c_")
 		hostname := parts[2]
-		device := parts[3] + "_" + parts[4]
+		// HCA device name is from parts[3] to the second-to-last part (before port number)
+		// This supports any HCA naming format: mlx5_0, mlx5_bond_0, mlx5_1_bond, etc.
+		device := strings.Join(parts[3:len(parts)-1], "_")
 
 		content, err := os.ReadFile(path)
 		if err != nil {
@@ -565,7 +567,9 @@ func collectP2PReportData(reportsDir string) (map[string]map[string]*deviceData,
 		}
 
 		hostname := parts[1]
-		device := parts[2] + "_" + parts[3]
+		// HCA device name is from parts[2] to the second-to-last part (before port number)
+		// This supports any HCA naming format: mlx5_0, mlx5_bond_0, mlx5_1_bond, etc.
+		device := strings.Join(parts[2:len(parts)-1], "_")
 
 		content, err := os.ReadFile(path)
 		if err != nil {
