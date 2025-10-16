@@ -59,14 +59,14 @@ func GenerateP2PScripts(cfg *config.Config) error {
 		clientHost := cfg.Client.Hostname[hostIndex]
 
 		// Get server IP
-		serverIP, err := getHostIP(serverHost, cfg.SSH.PrivateKey)
+		serverIP, err := getHostIP(serverHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
 		if err != nil {
 			fmt.Printf("❌ Error getting IP for server %s: %v\n", serverHost, err)
 			// continue
 		}
 
 		// Get client IP
-		clientIP, err := getHostIP(clientHost, cfg.SSH.PrivateKey)
+		clientIP, err := getHostIP(clientHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
 		if err != nil {
 			fmt.Printf("❌ Error getting IP for client %s: %v\n", clientHost, err)
 			// continue
@@ -154,9 +154,9 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 	return nil
 }
 
-// getHostIP retrieves the IP address of a host using bond0 interface
-func getHostIP(hostname string, sshKeyPath string) (string, error) {
-	command := "ip addr show bond0 | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1"
+// getHostIP retrieves the IP address of a host using specified network interface
+func getHostIP(hostname string, sshKeyPath string, networkInterface string) (string, error) {
+	command := fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1", networkInterface)
 	cmd := buildSSHCommand(hostname, command, sshKeyPath)
 
 	output, err := cmd.CombinedOutput()
@@ -166,7 +166,7 @@ func getHostIP(hostname string, sshKeyPath string) (string, error) {
 
 	ip := strings.TrimSpace(string(output))
 	if ip == "" {
-		return "127.0.0.1", fmt.Errorf("no IP address found for %s on bond0 interface", hostname)
+		return "127.0.0.1", fmt.Errorf("no IP address found for %s on %s interface", hostname, networkInterface)
 	}
 
 	return ip, nil

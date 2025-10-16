@@ -31,14 +31,8 @@ func GenerateFullMeshScript(cfg *config.Config) {
 
 	for _, Server := range allServerHostName {
 		port := cfg.StartPort
-		// ip addr show bond0 | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1
-		command := fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1", "bond0")
-
-		// 2. Create the command to be executed locally: ssh <hostname> "<command>"
-		cmd := buildSSHCommand(Server, command, cfg.SSH.PrivateKey)
-
 		// 3. Run the command and capture the combined output (stdout and stderr).
-		output, err := cmd.CombinedOutput()
+		output, err := getHostIP(Server, cfg.SSH.PrivateKey, cfg.NetworkInterface)
 		if err != nil {
 			// If command fails, return the output for debugging and a detailed error.
 			fmt.Printf("Error executing command on %s: %v\nOutput: %s\n", Server, err, string(output))

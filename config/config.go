@@ -23,6 +23,7 @@ type Config struct {
 	WaitingTimeSeconds int          `yaml:"waiting_time_seconds" json:"waiting_time_seconds"`
 	Speed              float64      `yaml:"speed" json:"speed"` // in Gbps
 	RdmaCm             bool         `yaml:"rdma_cm" json:"rdma_cm"`
+	NetworkInterface   string       `yaml:"network_interface" json:"network_interface"` // Network interface name for IP detection
 	Report             Report       `yaml:"report" json:"report"`
 	Run                Run          `yaml:"run" json:"run"`
 	SSH                SSH          `yaml:"ssh" json:"ssh"`
@@ -96,6 +97,7 @@ func NewDefaultConfig() *Config {
 		WaitingTimeSeconds: 15,
 		Speed:              400,
 		RdmaCm:             false,
+		NetworkInterface:   "bond0",
 		Report: Report{
 			Enable: true,
 			Dir:    "/root",
@@ -140,6 +142,10 @@ func (c *Config) ApplyDefaults() {
 	}
 	if c.Speed == 0 {
 		c.Speed = 400
+	}
+	// Network interface defaults
+	if c.NetworkInterface == "" {
+		c.NetworkInterface = "bond0"
 	}
 	// Report defaults
 	if c.Report.Dir == "" {

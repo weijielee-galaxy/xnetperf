@@ -22,11 +22,8 @@ func GenerateIncastScripts(cfg *config.Config) {
 	// 根据配置文件，生成在每个server的每个HCA上监听的脚本
 	port := cfg.StartPort
 	for _, sHost := range cfg.Server.Hostname {
-		command := fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1", "bond0")
-		// 2. Create the command to be executed locally: ssh <hostname> "<command>"
-		cmd := buildSSHCommand(sHost, command, cfg.SSH.PrivateKey)
 		// 3. Run the command and capture the combined output (stdout and stderr).
-		hostIP, err := cmd.CombinedOutput()
+		hostIP, err := getHostIP(sHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
 		if err != nil {
 			// If command fails, return the output for debugging and a detailed error.
 			fmt.Printf("Error executing command on %s: %v\nOutput: %s\n", sHost, err, string(hostIP))
