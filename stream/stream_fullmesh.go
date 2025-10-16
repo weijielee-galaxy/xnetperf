@@ -51,9 +51,9 @@ func GenerateFullMeshScript(cfg *config.Config) {
 
 			fmt.Println("Generating scripts for Server:", Server, "Client HCA:", hcaServer)
 			for _, allHost := range allServerHostName {
-				if allHost == Server {
-					continue
-				}
+				// if allHost == Server {
+				// 	continue
+				// }
 				for _, hcaClient := range cfg.Server.Hca {
 					fmt.Println("num:", num, "Server HCA:", Server, "Server HCA:", hcaClient, port)
 					fmt.Println("num:", num, "client HCA:", allHost, "Client HCA:", hcaClient, port, Server)
