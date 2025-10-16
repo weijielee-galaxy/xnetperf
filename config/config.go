@@ -154,3 +154,29 @@ func (c *Config) ApplyDefaults() {
 		c.SSH.PrivateKey = "~/.ssh/id_rsa"
 	}
 }
+
+// SaveConfig saves the config to a YAML file
+func SaveConfig(filePath string, cfg *Config) error {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config to YAML: %w", err)
+	}
+	err = os.WriteFile(filePath, data, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write config file '%s': %w", filePath, err)
+	}
+	return nil
+}
+
+// EnsureConfigFile checks if the config file exists, creates a default one if not
+func EnsureConfigFile(filePath string) error {
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		// File doesn't exist, create a default one
+		defaultCfg := NewDefaultConfig()
+		if err := SaveConfig(filePath, defaultCfg); err != nil {
+			return fmt.Errorf("failed to create default config file: %w", err)
+		}
+		fmt.Printf("Created default config file: %s\n", filePath)
+	}
+	return nil
+}
