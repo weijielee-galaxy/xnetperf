@@ -448,7 +448,8 @@ function TrafficTestPage({ configs }) {
 
   // 渲染步骤详细内容
   const renderStepContent = (step, status) => {
-    if (!status || status === 'running') {
+    // Probe 步骤需要在执行过程中实时显示结果
+    if (!status || (status === 'running' && step !== STEPS.PROBE)) {
       return null
     }
 
@@ -565,10 +566,19 @@ function TrafficTestPage({ configs }) {
         break
 
       case STEPS.PROBE:
-        if (probeData) {
+        // 在探测过程中实时显示结果，包括 running 状态
+        if (probeData && (status === 'running' || status === 'success')) {
           return (
             <Box mt={4}>
               <Divider mb={4} />
+              {status === 'running' && (
+                <Alert status="info" variant="subtle" mb={4}>
+                  <AlertIcon />
+                  <AlertDescription>
+                    正在实时探测进程状态...
+                  </AlertDescription>
+                </Alert>
+              )}
               <ProbeResults data={probeData} />
             </Box>
           )
