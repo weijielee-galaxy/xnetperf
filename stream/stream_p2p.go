@@ -117,6 +117,7 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 		DurationSeconds(cfg.Run.DurationSeconds).
 		Bidirectional(true). // P2P mode uses bidirectional testing
 		RdmaCm(cfg.RdmaCm).
+		GidIndex(cfg.GidIndex).
 		Report(cfg.Report.Enable).
 		OutputFileName(fmt.Sprintf("%s/report_%s_%s_%d.json", cfg.Report.Dir, serverHost, serverHca, port)).
 		SSHPrivateKey(cfg.SSH.PrivateKey).
@@ -134,6 +135,7 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 		DurationSeconds(cfg.Run.DurationSeconds).
 		Bidirectional(true). // P2P mode uses bidirectional testing
 		RdmaCm(cfg.RdmaCm).
+		GidIndex(cfg.GidIndex).
 		Report(cfg.Report.Enable).
 		OutputFileName(fmt.Sprintf("%s/report_%s_%s_%d.json", cfg.Report.Dir, clientHost, clientHca, port)).
 		SSHPrivateKey(cfg.SSH.PrivateKey).

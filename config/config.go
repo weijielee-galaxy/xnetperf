@@ -23,6 +23,7 @@ type Config struct {
 	WaitingTimeSeconds int          `yaml:"waiting_time_seconds" json:"waiting_time_seconds"`
 	Speed              float64      `yaml:"speed" json:"speed"` // in Gbps
 	RdmaCm             bool         `yaml:"rdma_cm" json:"rdma_cm"`
+	GidIndex           int          `yaml:"gid_index" json:"gid_index"`                 // GID index for RoCE v2
 	NetworkInterface   string       `yaml:"network_interface" json:"network_interface"` // Network interface name for IP detection
 	Report             Report       `yaml:"report" json:"report"`
 	Run                Run          `yaml:"run" json:"run"`
@@ -97,6 +98,7 @@ func NewDefaultConfig() *Config {
 		WaitingTimeSeconds: 15,
 		Speed:              400,
 		RdmaCm:             false,
+		GidIndex:           3,
 		NetworkInterface:   "bond0",
 		Report: Report{
 			Enable: true,
@@ -142,6 +144,10 @@ func (c *Config) ApplyDefaults() {
 	}
 	if c.Speed == 0 {
 		c.Speed = 400
+	}
+	// GID index defaults
+	if c.GidIndex == 0 {
+		c.GidIndex = 3
 	}
 	// Network interface defaults
 	if c.NetworkInterface == "" {

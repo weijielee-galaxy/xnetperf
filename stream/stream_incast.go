@@ -49,6 +49,7 @@ func GenerateIncastScripts(cfg *config.Config) {
 						RunInfinitely(cfg.Run.Infinitely).
 						DurationSeconds(cfg.Run.DurationSeconds).
 						RdmaCm(cfg.RdmaCm).
+						GidIndex(cfg.GidIndex).
 						Report(cfg.Report.Enable).
 						OutputFileName(fmt.Sprintf("%s/report_s_%s_%s_%d.json", cfg.Report.Dir, sHost, sHca, port)).
 						SSHPrivateKey(cfg.SSH.PrivateKey).
@@ -65,6 +66,7 @@ func GenerateIncastScripts(cfg *config.Config) {
 						RunInfinitely(cfg.Run.Infinitely).
 						DurationSeconds(cfg.Run.DurationSeconds).
 						RdmaCm(cfg.RdmaCm).
+						GidIndex(cfg.GidIndex).
 						Report(cfg.Report.Enable).
 						OutputFileName(fmt.Sprintf("%s/report_c_%s_%s_%d.json", cfg.Report.Dir, cHost, cHca, port)).
 						SSHPrivateKey(cfg.SSH.PrivateKey).
