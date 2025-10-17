@@ -38,25 +38,10 @@ func execGenerateCommand(cfg *config.Config) {
 	fmt.Printf("📝 Generating scripts for stream type: %s\n", cfg.StreamType)
 	fmt.Printf("📁 Output directory: %s\n\n", cfg.OutputDir())
 
-	switch cfg.StreamType {
-	case config.FullMesh:
-		stream.GenerateFullMeshScript(cfg)
-		fmt.Printf("\n✅ Full mesh scripts generated successfully in: %s\n", cfg.OutputDir())
-	case config.InCast:
-		stream.GenerateIncastScripts(cfg)
-		fmt.Printf("\n✅ Incast scripts generated successfully in: %s\n", cfg.OutputDir())
-	case config.P2P:
-		err := stream.GenerateP2PScripts(cfg)
-		if err != nil {
-			fmt.Printf("❌ Error generating P2P scripts: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Printf("\n✅ P2P scripts generated successfully in: %s\n", cfg.OutputDir())
-	default:
-		fmt.Printf("❌ Invalid stream_type '%s' in config. Supported types: fullmesh, incast, p2p\n", cfg.StreamType)
+	if err := stream.GenerateScripts(cfg); err != nil {
+		fmt.Printf("❌ Failed to generate scripts: %v\n", err)
 		os.Exit(1)
 	}
-
 	// 显示生成的脚本文件列表
 	displayGeneratedScripts(cfg)
 }

@@ -34,23 +34,10 @@ func ExecuteRun(cfg *config.Config) (*RunResult, error) {
 		}
 	}
 
-	// 根据不同的 stream 类型生成脚本
-	switch cfg.StreamType {
-	case config.FullMesh:
-		stream.GenerateFullMeshScript(cfg)
-	case config.InCast:
-		stream.GenerateIncastScripts(cfg)
-	case config.P2P:
-		err := stream.GenerateP2PScripts(cfg)
-		if err != nil {
-			result.Success = false
-			result.Error = fmt.Sprintf("Failed to generate P2P scripts: %v", err)
-			return result, fmt.Errorf("failed to generate P2P scripts: %v", err)
-		}
-	default:
-		err := fmt.Errorf("invalid stream_type '%s', supported types: fullmesh, incast, p2p", cfg.StreamType)
+	err := stream.GenerateScripts(cfg)
+	if err != nil {
 		result.Success = false
-		result.Error = err.Error()
+		result.Error = fmt.Sprintf("Failed to generate scripts: %v", err)
 		return result, err
 	}
 

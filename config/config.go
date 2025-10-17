@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	FullMesh string = "fullmesh"
-	InCast   string = "incast"
-	P2P      string = "p2p"
+	FullMesh  string = "fullmesh"
+	InCast    string = "incast"
+	P2P       string = "p2p"
+	LocalTest string = "localtest"
 )
 
 // Config holds the entire configuration from the YAML file.

@@ -1,5 +1,5 @@
 start_port: 20000
-stream_type: "p2p" # "fullmesh" or "incast" or "p2p"
+stream_type: "incast" # "fullmesh" or "incast" or "p2p", "localtest"
 qp_num: 10
 message_size_bytes: 4096
 output_base: "./generated_scripts"
@@ -18,12 +18,11 @@ run:
   duration_seconds: 20
 
 ssh:
-  private_key: "~/.ssh/id_rsa"
+  private_key: ""
 
 server:
   hostname:
   - "cetus-g88-094"
-  - "cetus-g88-065"
   hca:
   - "mlx5_0"
   - "mlx5_1"

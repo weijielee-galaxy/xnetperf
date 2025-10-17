@@ -38,19 +38,9 @@ func execRunCommand(cfg *config.Config) {
 		cleanupRemoteReportFiles(cfg)
 	}
 
-	switch cfg.StreamType {
-	case config.FullMesh:
-		stream.GenerateFullMeshScript(cfg)
-	case config.InCast:
-		stream.GenerateIncastScripts(cfg)
-	case config.P2P:
-		err := stream.GenerateP2PScripts(cfg)
-		if err != nil {
-			fmt.Printf("❌ Error generating P2P scripts: %v\n", err)
-			os.Exit(1)
-		}
-	default:
-		fmt.Printf("Invalid stream_type '%s' in config. Supported types: fullmesh, incast, p2p\n", cfg.StreamType)
+	err := stream.GenerateScripts(cfg)
+	if err != nil {
+		fmt.Printf("❌ Failed to generate scripts: %v\n", err)
 		os.Exit(1)
 	}
 	stream.DistributeAndRunScripts(cfg)

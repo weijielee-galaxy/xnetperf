@@ -51,9 +51,9 @@ func GenerateFullMeshScript(cfg *config.Config) {
 
 			fmt.Println("Generating scripts for Server:", Server, "Client HCA:", hcaServer)
 			for _, allHost := range allServerHostName {
-				// if allHost == Server {
-				// 	continue
-				// }
+				if allHost == Server {
+					continue
+				}
 				for _, hcaClient := range cfg.Server.Hca {
 					fmt.Println("num:", num, "Server HCA:", Server, "Server HCA:", hcaClient, port)
 					fmt.Println("num:", num, "client HCA:", allHost, "Client HCA:", hcaClient, port, Server)
@@ -298,4 +298,28 @@ func executeRemoteScript(hostname string, scriptContent []byte) error {
 		return fmt.Errorf("failed to execute script on %s: %w", hostname, err)
 	}
 	return nil
+}
+
+func GenerateScripts(cfg *config.Config) error {
+	fmt.Println("Generating scripts based on stream type:", cfg.StreamType)
+	switch cfg.StreamType {
+	case config.FullMesh:
+		GenerateFullMeshScript(cfg)
+		return nil
+	case config.InCast:
+		GenerateIncastScripts(cfg)
+		return nil
+	case config.P2P:
+		err := GenerateP2PScripts(cfg)
+		if err != nil {
+			fmt.Printf("❌ Error generating P2P scripts: %v\n", err)
+			return err
+		}
+		return nil
+	case config.LocalTest:
+		GenerateLocaltestScript(cfg)
+		return nil
+	default:
+		return fmt.Errorf("invalid stream_type '%s' in config", cfg.StreamType)
+	}
 }
