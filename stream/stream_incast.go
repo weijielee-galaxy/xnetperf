@@ -90,3 +90,49 @@ func GenerateIncastScripts(cfg *config.Config) {
 		}
 	}
 }
+
+/*
+ServerA
+  - mlx5_0
+
+ClientA
+  - mlx5_0
+  - mlx5_1
+
+ClientB
+  - mlx5_0
+  - mlx5_1
+*/
+func GenerateIncastScriptsV2(cfg *config.Config) {
+	// 运行在每个server的每个HCA上监听的脚本
+	for _, sHost := range cfg.Server.Hostname {
+		fmt.Println(sHost)
+		port := 20000
+		for _, sHca := range cfg.Server.Hca {
+			fmt.Println("\t", sHca)
+			for _, cHost := range cfg.Client.Hostname {
+				for _, cHca := range cfg.Client.Hca {
+					serverCmd := NewIBWriteBWCommandBuilder().
+						Host(sHost).
+						Device(sHca).
+						QueuePairNum(cfg.QpNum).
+						MessageSize(cfg.MessageSizeBytes).
+						Port(port).
+						RunInfinitely(cfg.Run.Infinitely).
+						DurationSeconds(cfg.Run.DurationSeconds).
+						RdmaCm(cfg.RdmaCm).
+						GidIndex(cfg.GidIndex).
+						Report(cfg.Report.Enable).
+						OutputFileName(fmt.Sprintf("%s/report_s_%s_%s_%d.json", cfg.Report.Dir, sHost, sHca, port)).
+						SSHPrivateKey(cfg.SSH.PrivateKey).
+						ServerCommand() // 服务器命令不需要目标IP
+					fmt.Println("\t\t", serverCmd.String())
+
+					_, _ = cHost, cHca // avoid unused variable error
+
+					port++
+				}
+			}
+		}
+	}
+}
