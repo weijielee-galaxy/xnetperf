@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -147,9 +146,9 @@ func TestParseLatencyReport(t *testing.T) {
 			name:     "Valid client report",
 			filename: "latency_c_host1_mlx5_0_to_host2_mlx5_1_p20000.json",
 			jsonContent: `{
-				"results": [
-					{"t_avg": 1.23}
-				]
+				"results": {
+					"t_avg": 1.23
+				}
 			}`,
 			expectError:     false,
 			expectNil:       false,
@@ -161,9 +160,9 @@ func TestParseLatencyReport(t *testing.T) {
 			name:     "Server report should be skipped",
 			filename: "latency_s_host1_mlx5_0_from_host2_mlx5_1_p20000.json",
 			jsonContent: `{
-				"results": [
-					{"t_avg": 1.23}
-				]
+				"results": {
+					"t_avg": 1.23
+				}
 			}`,
 			expectError: false,
 			expectNil:   true,
@@ -171,16 +170,20 @@ func TestParseLatencyReport(t *testing.T) {
 		{
 			name:        "Invalid filename format - old format",
 			filename:    "latency_c_host1_mlx5_0_20000.json",
-			jsonContent: `{"results": [{"t_avg": 1.23}]}`,
+			jsonContent: `{"results": {"t_avg": 1.23}}`,
 			expectError: true,
 		},
 		{
-			name:     "Empty results",
+			name:     "Missing results field - should parse as zero",
 			filename: "latency_c_host1_mlx5_0_to_host2_mlx5_1_p20000.json",
 			jsonContent: `{
-				"results": []
+				"test_info": {}
 			}`,
-			expectError: true,
+			expectError:     false,
+			expectNil:       false,
+			expectedSource:  "host1:mlx5_0",
+			expectedTarget:  "host2:mlx5_1",
+			expectedLatency: 0.0,
 		},
 		{
 			name:        "Invalid JSON",
@@ -262,35 +265,25 @@ func TestCollectLatencyReportData(t *testing.T) {
 	// Create sample latency report files
 	reports := []struct {
 		filename string
-		content  LatencyReport
+		content  string
 	}{
 		{
 			filename: "latency_c_host1_mlx5_0_to_host2_mlx5_1_p20000.json",
-			content: LatencyReport{Results: struct {
-				TAvg float64 `json:"t_avg"`
-			}{TAvg: 1.5}},
+			content:  `{"results": {"t_avg": 1.5}}`,
 		},
 		{
 			filename: "latency_c_host2_mlx5_1_to_host1_mlx5_0_p20001.json",
-			content: LatencyReport{Results: struct {
-				TAvg float64 `json:"t_avg"`
-			}{TAvg: 2.3}},
+			content:  `{"results": {"t_avg": 2.3}}`,
 		},
 		{
 			filename: "latency_s_host1_mlx5_0_from_host2_mlx5_1_p20000.json", // Should be skipped
-			content: LatencyReport{Results: struct {
-				TAvg float64 `json:"t_avg"`
-			}{TAvg: 1.0}},
+			content:  `{"results": {"t_avg": 1.0}}`,
 		},
 	}
 
 	for _, report := range reports {
-		data, err := json.Marshal(report.content)
-		if err != nil {
-			t.Fatalf("Failed to marshal JSON: %v", err)
-		}
 		filePath := filepath.Join(tmpDir, report.filename)
-		err = os.WriteFile(filePath, data, 0644)
+		err = os.WriteFile(filePath, []byte(report.content), 0644)
 		if err != nil {
 			t.Fatalf("Failed to write test file: %v", err)
 		}
@@ -387,6 +380,45 @@ func TestDisplayLatencyMatrix(t *testing.T) {
 				// host3 -> others
 				{SourceHost: "host3", SourceHCA: "mlx5_0", TargetHost: "host1", TargetHCA: "mlx5_0", AvgLatencyUs: 1.53},
 				{SourceHost: "host3", SourceHCA: "mlx5_0", TargetHost: "host2", TargetHCA: "mlx5_0", AvgLatencyUs: 1.51},
+			},
+			shouldOutput: true,
+		},
+		{
+			name: "Long hostname handling",
+			latencyData: []LatencyData{
+				// Very long hostnames should be truncated
+				{SourceHost: "very-long-hostname-that-exceeds-limits", SourceHCA: "mlx5_0", TargetHost: "another-very-long-hostname", TargetHCA: "mlx5_1", AvgLatencyUs: 2.35},
+				{SourceHost: "another-very-long-hostname", SourceHCA: "mlx5_1", TargetHost: "very-long-hostname-that-exceeds-limits", TargetHCA: "mlx5_0", AvgLatencyUs: 2.40},
+			},
+			shouldOutput: true,
+		},
+		{
+			name: "Mixed short and long names",
+			latencyData: []LatencyData{
+				{SourceHost: "h1", SourceHCA: "mlx5_0", TargetHost: "very-long-hostname-with-many-characters", TargetHCA: "mlx5_0", AvgLatencyUs: 1.25},
+				{SourceHost: "very-long-hostname-with-many-characters", SourceHCA: "mlx5_0", TargetHost: "h1", TargetHCA: "mlx5_0", AvgLatencyUs: 1.30},
+			},
+			shouldOutput: true,
+		},
+		{
+			name: "Multiple HCAs per host (merged cells)",
+			latencyData: []LatencyData{
+				// host1:mlx5_0 -> others
+				{SourceHost: "host1", SourceHCA: "mlx5_0", TargetHost: "host1", TargetHCA: "mlx5_1", AvgLatencyUs: 1.23},
+				{SourceHost: "host1", SourceHCA: "mlx5_0", TargetHost: "host2", TargetHCA: "mlx5_0", AvgLatencyUs: 1.45},
+				{SourceHost: "host1", SourceHCA: "mlx5_0", TargetHost: "host2", TargetHCA: "mlx5_1", AvgLatencyUs: 1.50},
+				// host1:mlx5_1 -> others
+				{SourceHost: "host1", SourceHCA: "mlx5_1", TargetHost: "host1", TargetHCA: "mlx5_0", AvgLatencyUs: 1.24},
+				{SourceHost: "host1", SourceHCA: "mlx5_1", TargetHost: "host2", TargetHCA: "mlx5_0", AvgLatencyUs: 1.46},
+				{SourceHost: "host1", SourceHCA: "mlx5_1", TargetHost: "host2", TargetHCA: "mlx5_1", AvgLatencyUs: 1.51},
+				// host2:mlx5_0 -> others
+				{SourceHost: "host2", SourceHCA: "mlx5_0", TargetHost: "host1", TargetHCA: "mlx5_0", AvgLatencyUs: 1.47},
+				{SourceHost: "host2", SourceHCA: "mlx5_0", TargetHost: "host1", TargetHCA: "mlx5_1", AvgLatencyUs: 1.48},
+				{SourceHost: "host2", SourceHCA: "mlx5_0", TargetHost: "host2", TargetHCA: "mlx5_1", AvgLatencyUs: 1.25},
+				// host2:mlx5_1 -> others
+				{SourceHost: "host2", SourceHCA: "mlx5_1", TargetHost: "host1", TargetHCA: "mlx5_0", AvgLatencyUs: 1.49},
+				{SourceHost: "host2", SourceHCA: "mlx5_1", TargetHost: "host1", TargetHCA: "mlx5_1", AvgLatencyUs: 1.50},
+				{SourceHost: "host2", SourceHCA: "mlx5_1", TargetHost: "host2", TargetHCA: "mlx5_0", AvgLatencyUs: 1.26},
 			},
 			shouldOutput: true,
 		},

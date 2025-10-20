@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 	"xnetperf/config"
 )
 
@@ -219,8 +220,8 @@ func RunLatencyScripts(cfg *config.Config) error {
 	}
 
 	// Wait for servers to initialize
-	fmt.Println("⏳ Waiting 2 seconds for servers to initialize...")
-	// time.Sleep(2 * time.Second)
+	fmt.Printf("\nWaiting %d seconds for servers to initialize...\n", cfg.WaitingTimeSeconds)
+	time.Sleep(time.Second * time.Duration(cfg.WaitingTimeSeconds))
 
 	fmt.Println("Phase 2: Starting all client processes...")
 

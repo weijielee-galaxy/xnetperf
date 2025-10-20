@@ -363,122 +363,282 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 		return
 	}
 
-	// Build matrix structure: source -> target -> latency
-	matrix := make(map[string]map[string]float64)
-	allSources := make(map[string]bool)
-	allTargets := make(map[string]bool)
-
+	// Build matrix structure and collect unique hosts/HCAs
+	type HostHCA struct {
+		Host string
+		HCA  string
+	}
+	
+	sourceHostHCAs := make(map[string][]string) // host -> []hca
+	targetHostHCAs := make(map[string][]string) // host -> []hca
+	matrix := make(map[string]map[string]float64) // "host:hca" -> "host:hca" -> latency
+	
 	for _, data := range latencyData {
-		source := fmt.Sprintf("%s:%s", data.SourceHost, data.SourceHCA)
-		target := fmt.Sprintf("%s:%s", data.TargetHost, data.TargetHCA)
-
-		if matrix[source] == nil {
-			matrix[source] = make(map[string]float64)
+		// Track source hosts and HCAs
+		if sourceHostHCAs[data.SourceHost] == nil {
+			sourceHostHCAs[data.SourceHost] = []string{}
 		}
-		matrix[source][target] = data.AvgLatencyUs
-
-		allSources[source] = true
-		allTargets[target] = true
+		found := false
+		for _, hca := range sourceHostHCAs[data.SourceHost] {
+			if hca == data.SourceHCA {
+				found = true
+				break
+			}
+		}
+		if !found {
+			sourceHostHCAs[data.SourceHost] = append(sourceHostHCAs[data.SourceHost], data.SourceHCA)
+		}
+		
+		// Track target hosts and HCAs
+		if targetHostHCAs[data.TargetHost] == nil {
+			targetHostHCAs[data.TargetHost] = []string{}
+		}
+		found = false
+		for _, hca := range targetHostHCAs[data.TargetHost] {
+			if hca == data.TargetHCA {
+				found = true
+				break
+			}
+		}
+		if !found {
+			targetHostHCAs[data.TargetHost] = append(targetHostHCAs[data.TargetHost], data.TargetHCA)
+		}
+		
+		// Build matrix
+		sourceKey := fmt.Sprintf("%s:%s", data.SourceHost, data.SourceHCA)
+		targetKey := fmt.Sprintf("%s:%s", data.TargetHost, data.TargetHCA)
+		if matrix[sourceKey] == nil {
+			matrix[sourceKey] = make(map[string]float64)
+		}
+		matrix[sourceKey][targetKey] = data.AvgLatencyUs
 	}
-
-	// Sort sources and targets
-	var sources []string
-	for source := range allSources {
-		sources = append(sources, source)
+	
+	// Sort hosts and their HCAs
+	var sourceHosts []string
+	for host := range sourceHostHCAs {
+		sourceHosts = append(sourceHosts, host)
+		sort.Strings(sourceHostHCAs[host])
 	}
-	sort.Strings(sources)
-
-	var targets []string
-	for target := range allTargets {
-		targets = append(targets, target)
+	sort.Strings(sourceHosts)
+	
+	var targetHosts []string
+	for host := range targetHostHCAs {
+		targetHosts = append(targetHosts, host)
+		sort.Strings(targetHostHCAs[host])
 	}
-	sort.Strings(targets)
-
+	sort.Strings(targetHosts)
+	
 	// Calculate column widths
-	sourceWidth := 20
-	for _, source := range sources {
-		if len(source) > sourceWidth {
-			sourceWidth = len(source)
+	hostColWidth := 10 // Minimum width for hostname column
+	for _, host := range sourceHosts {
+		if len(host) > hostColWidth && len(host) <= 20 {
+			hostColWidth = len(host)
+		} else if len(host) > 20 {
+			hostColWidth = 20 // Cap at 20
 		}
 	}
-
-	targetColWidth := 12 // Width for each latency value column
-
+	for _, host := range targetHosts {
+		if len(host) > hostColWidth && len(host) <= 20 {
+			hostColWidth = len(host)
+		} else if len(host) > 20 {
+			hostColWidth = 20
+		}
+	}
+	
+	hcaColWidth := 10 // Minimum width for HCA column
+	for _, hcas := range sourceHostHCAs {
+		for _, hca := range hcas {
+			if len(hca) > hcaColWidth && len(hca) <= 15 {
+				hcaColWidth = len(hca)
+			} else if len(hca) > 15 {
+				hcaColWidth = 15 // Cap at 15
+			}
+		}
+	}
+	
+	valueColWidth := 12 // Width for latency values (e.g., "123.45 μs")
+	
 	// Print title
 	fmt.Println("\n" + strings.Repeat("=", 80))
 	fmt.Println("📊 Latency Matrix (Average Latency in microseconds)")
 	fmt.Println(strings.Repeat("=", 80))
-
-	// Print table header top border
-	sourceDashes := strings.Repeat("─", sourceWidth)
-	fmt.Printf("┌─%s─┬", sourceDashes)
-	for i := range targets {
-		if i < len(targets)-1 {
-			fmt.Printf("─%s─┬", strings.Repeat("─", targetColWidth))
+	
+	// Count total target columns
+	totalTargetCols := 0
+	for _, host := range targetHosts {
+		totalTargetCols += len(targetHostHCAs[host])
+	}
+	
+	// Print top border
+	fmt.Printf("┌%s┬%s┬",
+		strings.Repeat("─", hostColWidth+2),
+		strings.Repeat("─", hcaColWidth+2))
+	for i, targetHost := range targetHosts {
+		numHCAs := len(targetHostHCAs[targetHost])
+		width := numHCAs*valueColWidth + (numHCAs-1)*3 + 2
+		if i < len(targetHosts)-1 {
+			fmt.Printf("%s┬", strings.Repeat("─", width))
 		} else {
-			fmt.Printf("─%s─┐\n", strings.Repeat("─", targetColWidth))
+			fmt.Printf("%s┐\n", strings.Repeat("─", width))
 		}
 	}
-
-	// Print column headers (target nodes)
-	fmt.Printf("│ %-*s │", sourceWidth, "Source → Target")
-	for _, target := range targets {
-		// Truncate long target names
-		displayTarget := target
-		if len(target) > targetColWidth {
-			displayTarget = target[:targetColWidth-2] + ".."
+	
+	// Print first header row (target hostnames)
+	fmt.Printf("│%*s│%*s│",
+		hostColWidth+2, " ",
+		hcaColWidth+2, " ")
+	for i, targetHost := range targetHosts {
+		numHCAs := len(targetHostHCAs[targetHost])
+		width := numHCAs*valueColWidth + (numHCAs-1)*3
+		displayHost := targetHost
+		if len(targetHost) > width {
+			displayHost = targetHost[:width-2] + ".."
 		}
-		fmt.Printf(" %-*s │", targetColWidth, displayTarget)
-	}
-	fmt.Println()
-
-	// Print header separator
-	fmt.Printf("├─%s─┼", sourceDashes)
-	for i := range targets {
-		if i < len(targets)-1 {
-			fmt.Printf("─%s─┼", strings.Repeat("─", targetColWidth))
+		if i < len(targetHosts)-1 {
+			fmt.Printf(" %-*s │", width, displayHost)
 		} else {
-			fmt.Printf("─%s─┤\n", strings.Repeat("─", targetColWidth))
+			fmt.Printf(" %-*s │\n", width, displayHost)
 		}
 	}
-
-	// Print data rows
-	for i, source := range sources {
-		fmt.Printf("│ %-*s │", sourceWidth, source)
-
-		for _, target := range targets {
-			latency := matrix[source][target]
-			if latency > 0 {
-				fmt.Printf(" %*.2f μs │", targetColWidth-3, latency)
+	
+	// Print separator between hostname row and HCA row
+	fmt.Printf("│%*s│%*s├",
+		hostColWidth+2, " ",
+		hcaColWidth+2, " ")
+	for i, targetHost := range targetHosts {
+		hcas := targetHostHCAs[targetHost]
+		for j := range hcas {
+			if j < len(hcas)-1 {
+				fmt.Printf("%s┬", strings.Repeat("─", valueColWidth+2))
 			} else {
-				fmt.Printf(" %-*s │", targetColWidth, "-")
-			}
-		}
-		fmt.Println()
-
-		// Print row separator (except for last row)
-		if i < len(sources)-1 {
-			fmt.Printf("├─%s─┼", sourceDashes)
-			for j := range targets {
-				if j < len(targets)-1 {
-					fmt.Printf("─%s─┼", strings.Repeat("─", targetColWidth))
+				if i < len(targetHosts)-1 {
+					fmt.Printf("%s┼", strings.Repeat("─", valueColWidth+2))
 				} else {
-					fmt.Printf("─%s─┤\n", strings.Repeat("─", targetColWidth))
+					fmt.Printf("%s┤\n", strings.Repeat("─", valueColWidth+2))
 				}
 			}
 		}
 	}
-
-	// Print table bottom border
-	fmt.Printf("└─%s─┴", sourceDashes)
-	for i := range targets {
-		if i < len(targets)-1 {
-			fmt.Printf("─%s─┴", strings.Repeat("─", targetColWidth))
-		} else {
-			fmt.Printf("─%s─┘\n", strings.Repeat("─", targetColWidth))
+	
+	// Print second header row (target HCAs)
+	fmt.Printf("│%*s│%*s│",
+		hostColWidth+2, " ",
+		hcaColWidth+2, " ")
+	for i, targetHost := range targetHosts {
+		hcas := targetHostHCAs[targetHost]
+		for j, hca := range hcas {
+			displayHCA := hca
+			if len(hca) > valueColWidth {
+				displayHCA = hca[:valueColWidth-2] + ".."
+			}
+			if j < len(hcas)-1 || i < len(targetHosts)-1 {
+				fmt.Printf(" %-*s │", valueColWidth, displayHCA)
+			} else {
+				fmt.Printf(" %-*s │\n", valueColWidth, displayHCA)
+			}
 		}
 	}
-
+	
+	// Print header separator
+	fmt.Printf("├%s┼%s┼",
+		strings.Repeat("─", hostColWidth+2),
+		strings.Repeat("─", hcaColWidth+2))
+	for i := 0; i < totalTargetCols; i++ {
+		if i < totalTargetCols-1 {
+			fmt.Printf("%s┼", strings.Repeat("─", valueColWidth+2))
+		} else {
+			fmt.Printf("%s┤\n", strings.Repeat("─", valueColWidth+2))
+		}
+	}
+	
+	// Print data rows
+	rowIdx := 0
+	for _, sourceHost := range sourceHosts {
+		sourceHCAs := sourceHostHCAs[sourceHost]
+		for hcaIdx, sourceHCA := range sourceHCAs {
+			// Print hostname in first column (only for first HCA of this host)
+			if hcaIdx == 0 {
+				displayHost := sourceHost
+				if len(sourceHost) > hostColWidth {
+					displayHost = sourceHost[:hostColWidth-2] + ".."
+				}
+				fmt.Printf("│ %-*s │", hostColWidth, displayHost)
+			} else {
+				fmt.Printf("│%*s│", hostColWidth+2, " ")
+			}
+			
+			// Print HCA in second column
+			displayHCA := sourceHCA
+			if len(sourceHCA) > hcaColWidth {
+				displayHCA = sourceHCA[:hcaColWidth-2] + ".."
+			}
+			fmt.Printf(" %-*s │", hcaColWidth, displayHCA)
+			
+			// Print latency values
+			for _, targetHost := range targetHosts {
+				targetHCAs := targetHostHCAs[targetHost]
+				for _, targetHCA := range targetHCAs {
+					sourceKey := fmt.Sprintf("%s:%s", sourceHost, sourceHCA)
+					targetKey := fmt.Sprintf("%s:%s", targetHost, targetHCA)
+					latency := matrix[sourceKey][targetKey]
+					
+					if latency > 0 {
+						valueStr := fmt.Sprintf("%.2f μs", latency)
+						fmt.Printf(" %*s │", valueColWidth, valueStr)
+					} else {
+						fmt.Printf(" %*s │", valueColWidth, "-")
+					}
+				}
+			}
+			fmt.Println()
+			
+			rowIdx++
+			
+			// Print row separator
+			needsSeparator := false
+			isLastHCAOfHost := hcaIdx == len(sourceHCAs)-1
+			isLastHost := sourceHost == sourceHosts[len(sourceHosts)-1]
+			
+			if !isLastHost || !isLastHCAOfHost {
+				if isLastHCAOfHost {
+					// Separator between different hosts (with left border crossing hostname column)
+					fmt.Printf("├%s┼%s┼",
+						strings.Repeat("─", hostColWidth+2),
+						strings.Repeat("─", hcaColWidth+2))
+					needsSeparator = true
+				} else {
+					// Separator within same host (hostname column stays empty)
+					fmt.Printf("│%*s├%s┼",
+						hostColWidth+2, " ",
+						strings.Repeat("─", hcaColWidth+2))
+					needsSeparator = true
+				}
+				
+				if needsSeparator {
+					for i := 0; i < totalTargetCols; i++ {
+						if i < totalTargetCols-1 {
+							fmt.Printf("%s┼", strings.Repeat("─", valueColWidth+2))
+						} else {
+							fmt.Printf("%s┤\n", strings.Repeat("─", valueColWidth+2))
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	// Print bottom border
+	fmt.Printf("└%s┴%s┴",
+		strings.Repeat("─", hostColWidth+2),
+		strings.Repeat("─", hcaColWidth+2))
+	for i := 0; i < totalTargetCols; i++ {
+		if i < totalTargetCols-1 {
+			fmt.Printf("%s┴", strings.Repeat("─", valueColWidth+2))
+		} else {
+			fmt.Printf("%s┘\n", strings.Repeat("─", valueColWidth+2))
+		}
+	}
+	
 	// Calculate and display statistics
 	var allLatencies []float64
 	for _, data := range latencyData {
