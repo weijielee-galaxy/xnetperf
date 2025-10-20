@@ -68,13 +68,15 @@ func GenerateLatencyScripts(cfg *config.Config) error {
 }
 
 // calculateTotalLatencyPorts calculates the total number of ports needed
-// For N hosts with H HCAs each, we need N × H × (N-1) × H ports
-// (each HCA tests to all HCAs on all other hosts)
+// For N hosts with H HCAs each, we need N × H × (N × H - 1) ports
+// (each HCA tests to all other HCAs except itself)
 func calculateTotalLatencyPorts(hosts []string, hcas []string) int {
 	numHosts := len(hosts)
 	numHcas := len(hcas)
-	// Each host HCA tests to all other hosts' HCAs
-	return numHosts * numHcas * (numHosts - 1) * numHcas
+	totalHCAs := numHosts * numHcas
+	// Each HCA tests to all other HCAs (including same host, different HCA)
+	// but not to itself
+	return totalHCAs * (totalHCAs - 1)
 }
 
 // generateLatencyScriptsForHost generates server and client scripts for a specific host
@@ -125,12 +127,12 @@ func generateLatencyScriptForHCA(
 
 	// Generate commands for testing to all other hosts
 	for _, targetHost := range allHosts {
-		if targetHost == currentHost {
-			continue // Skip self-testing
-		}
-
 		// Test to all HCAs on the target host
 		for _, targetHCA := range cfg.Server.Hca {
+			// Skip only if same host AND same HCA
+			if targetHost == currentHost && targetHCA == currentHCA {
+				continue // Skip testing same HCA to itself
+			}
 			// Generate server command (runs on current host)
 			serverCmd := NewIBWriteBWCommandBuilder().
 				Host(currentHost).

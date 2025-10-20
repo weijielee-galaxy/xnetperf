@@ -20,25 +20,25 @@ func TestCalculateTotalLatencyPorts(t *testing.T) {
 			name:     "2 hosts, 2 HCAs each",
 			hosts:    []string{"host1", "host2"},
 			hcas:     []string{"mlx5_0", "mlx5_1"},
-			expected: 2 * 2 * 1 * 2, // 2 hosts * 2 HCAs * (2-1) other hosts * 2 HCAs = 8
+			expected: 4 * 3, // 4 total HCAs * (4-1) other HCAs = 12
 		},
 		{
 			name:     "3 hosts, 2 HCAs each",
 			hosts:    []string{"host1", "host2", "host3"},
 			hcas:     []string{"mlx5_0", "mlx5_1"},
-			expected: 3 * 2 * 2 * 2, // 3 hosts * 2 HCAs * (3-1) other hosts * 2 HCAs = 24
+			expected: 6 * 5, // 6 total HCAs * (6-1) other HCAs = 30
 		},
 		{
 			name:     "2 hosts, 1 HCA each",
 			hosts:    []string{"host1", "host2"},
 			hcas:     []string{"mlx5_0"},
-			expected: 2 * 1 * 1 * 1, // 2 hosts * 1 HCA * (2-1) other hosts * 1 HCA = 2
+			expected: 2 * 1, // 2 total HCAs * (2-1) other HCAs = 2
 		},
 		{
 			name:     "4 hosts, 3 HCAs each",
 			hosts:    []string{"host1", "host2", "host3", "host4"},
 			hcas:     []string{"mlx5_0", "mlx5_1", "mlx5_2"},
-			expected: 4 * 3 * 3 * 3, // 4 hosts * 3 HCAs * (4-1) other hosts * 3 HCAs = 108
+			expected: 12 * 11, // 12 total HCAs * (12-1) other HCAs = 132
 		},
 	}
 
@@ -55,7 +55,8 @@ func TestCalculateTotalLatencyPorts(t *testing.T) {
 // TestCalculateTotalLatencyPortsFormula verifies the formula is correct
 func TestCalculateTotalLatencyPortsFormula(t *testing.T) {
 	// For N hosts with H HCAs each:
-	// Total connections = N * H * (N-1) * H = N * H^2 * (N-1)
+	// Total HCAs = N * H
+	// Total connections = (N * H) * (N * H - 1)
 
 	// Example: 10 hosts with 4 HCAs each
 	hosts := make([]string, 10)
@@ -65,7 +66,8 @@ func TestCalculateTotalLatencyPortsFormula(t *testing.T) {
 	hcas := []string{"mlx5_0", "mlx5_1", "mlx5_2", "mlx5_3"}
 
 	result := calculateTotalLatencyPorts(hosts, hcas)
-	expected := 10 * 4 * 9 * 4 // 1440 ports
+	totalHCAs := 10 * 4 // 40 total HCAs
+	expected := totalHCAs * (totalHCAs - 1) // 40 * 39 = 1560 ports
 
 	if result != expected {
 		t.Errorf("For 10 hosts with 4 HCAs: got %d ports, expected %d", result, expected)
@@ -127,8 +129,11 @@ func TestGenerateLatencyScriptForHCA(t *testing.T) {
 	}
 
 	// Verify port calculation
-	// Should test to 2 other hosts, each with 2 HCAs = 4 tests
-	expectedNextPort := startPort + 4
+	// Should test to:
+	// - Same host (host1), different HCA: 1 test (mlx5_1)
+	// - Other hosts (host2, host3), all HCAs: 2 hosts * 2 HCAs = 4 tests
+	// Total: 1 + 4 = 5 tests
+	expectedNextPort := startPort + 5
 	if nextPort != expectedNextPort {
 		t.Errorf("Expected next port %d, got %d", expectedNextPort, nextPort)
 	}
@@ -159,9 +164,11 @@ func TestGenerateLatencyScriptForHCA(t *testing.T) {
 		}
 	}
 
-	// Should have 4 server commands (2 other hosts × 2 HCAs each)
-	if nonEmptyServerLines != 4 {
-		t.Errorf("Expected 4 server commands, got %d", nonEmptyServerLines)
+	// Should have 5 server commands:
+	// - 1 for same host different HCA (host1:mlx5_1)
+	// - 4 for other hosts (host2:mlx5_0, host2:mlx5_1, host3:mlx5_0, host3:mlx5_1)
+	if nonEmptyServerLines != 5 {
+		t.Errorf("Expected 5 server commands, got %d", nonEmptyServerLines)
 	}
 
 	// Verify server script contains expected elements
@@ -174,13 +181,15 @@ func TestGenerateLatencyScriptForHCA(t *testing.T) {
 		"-p 20001",
 		"-p 20002",
 		"-p 20003",
+		"-p 20004",
 		"-R",   // RDMA-CM flag for ib_write_lat
 		"-x 3", // GID index flag for ib_write_lat
 		"--out_json",
-		"latency_s_host1_mlx5_0_from_host2_mlx5_0_p20000.json",
-		"latency_s_host1_mlx5_0_from_host2_mlx5_1_p20001.json",
-		"latency_s_host1_mlx5_0_from_host3_mlx5_0_p20002.json",
-		"latency_s_host1_mlx5_0_from_host3_mlx5_1_p20003.json",
+		"latency_s_host1_mlx5_0_from_host1_mlx5_1_p20000.json", // Same host, different HCA
+		"latency_s_host1_mlx5_0_from_host2_mlx5_0_p20001.json",
+		"latency_s_host1_mlx5_0_from_host2_mlx5_1_p20002.json",
+		"latency_s_host1_mlx5_0_from_host3_mlx5_0_p20003.json",
+		"latency_s_host1_mlx5_0_from_host3_mlx5_1_p20004.json",
 	}
 
 	for _, expected := range expectedServerElements {
@@ -203,14 +212,17 @@ func TestGenerateLatencyScriptForHCA(t *testing.T) {
 		}
 	}
 
-	// Should have 4 client commands (2 other hosts × 2 HCAs each)
-	if nonEmptyClientLines != 4 {
-		t.Errorf("Expected 4 client commands, got %d", nonEmptyClientLines)
+	// Should have 5 client commands:
+	// - 1 for same host different HCA (host1:mlx5_1)
+	// - 4 for other hosts (host2:mlx5_0, host2:mlx5_1, host3:mlx5_0, host3:mlx5_1)
+	if nonEmptyClientLines != 5 {
+		t.Errorf("Expected 5 client commands, got %d", nonEmptyClientLines)
 	}
 
 	// Verify client script contains expected elements
 	clientStr := string(clientContent)
 	expectedClientElements := []string{
+		"ssh -i /home/user/.ssh/id_rsa host1", // Same host
 		"ssh -i /home/user/.ssh/id_rsa host2",
 		"ssh -i /home/user/.ssh/id_rsa host3",
 		"ib_write_lat",
@@ -221,13 +233,15 @@ func TestGenerateLatencyScriptForHCA(t *testing.T) {
 		"-p 20001",
 		"-p 20002",
 		"-p 20003",
+		"-p 20004",
 		"-R",   // RDMA-CM flag for ib_write_lat
 		"-x 3", // GID index flag for ib_write_lat
 		"--out_json",
-		"latency_c_host2_mlx5_0_to_host1_mlx5_0_p20000.json",
-		"latency_c_host2_mlx5_1_to_host1_mlx5_0_p20001.json",
-		"latency_c_host3_mlx5_0_to_host1_mlx5_0_p20002.json",
-		"latency_c_host3_mlx5_1_to_host1_mlx5_0_p20003.json",
+		"latency_c_host1_mlx5_1_to_host1_mlx5_0_p20000.json", // Same host, different HCA
+		"latency_c_host2_mlx5_0_to_host1_mlx5_0_p20001.json",
+		"latency_c_host2_mlx5_1_to_host1_mlx5_0_p20002.json",
+		"latency_c_host3_mlx5_0_to_host1_mlx5_0_p20003.json",
+		"latency_c_host3_mlx5_1_to_host1_mlx5_0_p20004.json",
 	}
 
 	for _, expected := range expectedClientElements {
@@ -306,20 +320,36 @@ func TestGenerateLatencyScriptForHCA_FilenameFormat(t *testing.T) {
 	}
 
 	// Verify filename format in server script
-	// Server on node-a:mlx5_0 receives FROM node-b:mlx5_1
 	serverStr := string(serverContent)
-	expectedServerFilename := "latency_s_node-a_mlx5_0_from_node-b_mlx5_1_p25000.json"
-	if !strings.Contains(serverStr, expectedServerFilename) {
-		t.Errorf("Server script missing expected filename: %s", expectedServerFilename)
+	
+	// First connection: same host, different HCA (node-a:mlx5_1 -> node-a:mlx5_0)
+	expectedServerFilename1 := "latency_s_node-a_mlx5_0_from_node-a_mlx5_1_p25000.json"
+	if !strings.Contains(serverStr, expectedServerFilename1) {
+		t.Errorf("Server script missing expected filename: %s", expectedServerFilename1)
+		t.Logf("Server script content:\n%s", serverStr)
+	}
+	
+	// Second connection: different host (node-b:mlx5_1 -> node-a:mlx5_0)
+	expectedServerFilename2 := "latency_s_node-a_mlx5_0_from_node-b_mlx5_1_p25001.json"
+	if !strings.Contains(serverStr, expectedServerFilename2) {
+		t.Errorf("Server script missing expected filename: %s", expectedServerFilename2)
 		t.Logf("Server script content:\n%s", serverStr)
 	}
 
 	// Verify filename format in client script
-	// Client on node-b:mlx5_1 connects TO node-a:mlx5_0
 	clientStr := string(clientContent)
-	expectedClientFilename := "latency_c_node-b_mlx5_1_to_node-a_mlx5_0_p25000.json"
-	if !strings.Contains(clientStr, expectedClientFilename) {
-		t.Errorf("Client script missing expected filename: %s", expectedClientFilename)
+	
+	// First connection: same host (node-a:mlx5_1 -> node-a:mlx5_0)
+	expectedClientFilename1 := "latency_c_node-a_mlx5_1_to_node-a_mlx5_0_p25000.json"
+	if !strings.Contains(clientStr, expectedClientFilename1) {
+		t.Errorf("Client script missing expected filename: %s", expectedClientFilename1)
+		t.Logf("Client script content:\n%s", clientStr)
+	}
+	
+	// Second connection: different host (node-b:mlx5_1 -> node-a:mlx5_0)
+	expectedClientFilename2 := "latency_c_node-b_mlx5_1_to_node-a_mlx5_0_p25001.json"
+	if !strings.Contains(clientStr, expectedClientFilename2) {
+		t.Errorf("Client script missing expected filename: %s", expectedClientFilename2)
 		t.Logf("Client script content:\n%s", clientStr)
 	}
 
@@ -333,12 +363,18 @@ func TestGenerateLatencyScriptForHCA_FilenameFormat(t *testing.T) {
 		t.Error("Server filename should contain '_from_' separator")
 	}
 
-	// Verify port prefix _p in both filenames
+	// Verify port prefix _p in both filenames (both ports 25000 and 25001)
 	if !strings.Contains(serverStr, "_p25000") {
-		t.Error("Server filename should contain '_p' port prefix")
+		t.Error("Server filename should contain '_p25000' port prefix")
+	}
+	if !strings.Contains(serverStr, "_p25001") {
+		t.Error("Server filename should contain '_p25001' port prefix")
 	}
 	if !strings.Contains(clientStr, "_p25000") {
-		t.Error("Client filename should contain '_p' port prefix")
+		t.Error("Client filename should contain '_p25000' port prefix")
+	}
+	if !strings.Contains(clientStr, "_p25001") {
+		t.Error("Client filename should contain '_p25001' port prefix")
 	}
 }
 
@@ -395,8 +431,11 @@ func TestGenerateLatencyScriptForHCA_PortAllocation(t *testing.T) {
 		t.Fatalf("generateLatencyScriptForHCA for mlx5_0 failed: %v", err)
 	}
 
-	// Should use 2 ports (1 other host × 2 HCAs)
-	expectedNextPort1 := startPort + 2
+	// Should use 3 ports:
+	// - Same host different HCA: 1 test (host1:mlx5_1)
+	// - Other host: 1 host * 2 HCAs = 2 tests
+	// Total: 1 + 2 = 3 tests
+	expectedNextPort1 := startPort + 3
 	if nextPort1 != expectedNextPort1 {
 		t.Errorf("After mlx5_0: expected next port %d, got %d", expectedNextPort1, nextPort1)
 	}
@@ -409,8 +448,8 @@ func TestGenerateLatencyScriptForHCA_PortAllocation(t *testing.T) {
 		t.Fatalf("generateLatencyScriptForHCA for mlx5_1 failed: %v", err)
 	}
 
-	// Should use 2 more ports
-	expectedNextPort2 := nextPort1 + 2
+	// Should use 3 more ports (same as mlx5_0)
+	expectedNextPort2 := nextPort1 + 3
 	if nextPort2 != expectedNextPort2 {
 		t.Errorf("After mlx5_1: expected next port %d, got %d", expectedNextPort2, nextPort2)
 	}
@@ -428,7 +467,7 @@ func TestGenerateLatencyScriptForHCA_PortAllocation(t *testing.T) {
 		t.Fatalf("Failed to read mlx5_1 script: %v", err)
 	}
 
-	// Verify mlx5_0 uses ports 30000-30001
+	// Verify mlx5_0 uses ports 30000-30002
 	str1 := string(content1)
 	if !strings.Contains(str1, "-p 30000") {
 		t.Error("mlx5_0 script should contain port 30000")
@@ -436,22 +475,31 @@ func TestGenerateLatencyScriptForHCA_PortAllocation(t *testing.T) {
 	if !strings.Contains(str1, "-p 30001") {
 		t.Error("mlx5_0 script should contain port 30001")
 	}
-	if strings.Contains(str1, "-p 30002") {
-		t.Error("mlx5_0 script should NOT contain port 30002")
+	if !strings.Contains(str1, "-p 30002") {
+		t.Error("mlx5_0 script should contain port 30002")
+	}
+	if strings.Contains(str1, "-p 30003") {
+		t.Error("mlx5_0 script should NOT contain port 30003")
 	}
 
-	// Verify mlx5_1 uses ports 30002-30003
+	// Verify mlx5_1 uses ports 30003-30005
 	str2 := string(content2)
-	if !strings.Contains(str2, "-p 30002") {
-		t.Error("mlx5_1 script should contain port 30002")
-	}
 	if !strings.Contains(str2, "-p 30003") {
 		t.Error("mlx5_1 script should contain port 30003")
+	}
+	if !strings.Contains(str2, "-p 30004") {
+		t.Error("mlx5_1 script should contain port 30004")
+	}
+	if !strings.Contains(str2, "-p 30005") {
+		t.Error("mlx5_1 script should contain port 30005")
 	}
 	if strings.Contains(str2, "-p 30000") {
 		t.Error("mlx5_1 script should NOT contain port 30000")
 	}
 	if strings.Contains(str2, "-p 30001") {
 		t.Error("mlx5_1 script should NOT contain port 30001")
+	}
+	if strings.Contains(str2, "-p 30002") {
+		t.Error("mlx5_1 script should NOT contain port 30002")
 	}
 }

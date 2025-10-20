@@ -368,11 +368,11 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 		Host string
 		HCA  string
 	}
-	
-	sourceHostHCAs := make(map[string][]string) // host -> []hca
-	targetHostHCAs := make(map[string][]string) // host -> []hca
+
+	sourceHostHCAs := make(map[string][]string)   // host -> []hca
+	targetHostHCAs := make(map[string][]string)   // host -> []hca
 	matrix := make(map[string]map[string]float64) // "host:hca" -> "host:hca" -> latency
-	
+
 	for _, data := range latencyData {
 		// Track source hosts and HCAs
 		if sourceHostHCAs[data.SourceHost] == nil {
@@ -388,7 +388,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 		if !found {
 			sourceHostHCAs[data.SourceHost] = append(sourceHostHCAs[data.SourceHost], data.SourceHCA)
 		}
-		
+
 		// Track target hosts and HCAs
 		if targetHostHCAs[data.TargetHost] == nil {
 			targetHostHCAs[data.TargetHost] = []string{}
@@ -403,7 +403,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 		if !found {
 			targetHostHCAs[data.TargetHost] = append(targetHostHCAs[data.TargetHost], data.TargetHCA)
 		}
-		
+
 		// Build matrix
 		sourceKey := fmt.Sprintf("%s:%s", data.SourceHost, data.SourceHCA)
 		targetKey := fmt.Sprintf("%s:%s", data.TargetHost, data.TargetHCA)
@@ -412,7 +412,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 		}
 		matrix[sourceKey][targetKey] = data.AvgLatencyUs
 	}
-	
+
 	// Sort hosts and their HCAs
 	var sourceHosts []string
 	for host := range sourceHostHCAs {
@@ -420,14 +420,14 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 		sort.Strings(sourceHostHCAs[host])
 	}
 	sort.Strings(sourceHosts)
-	
+
 	var targetHosts []string
 	for host := range targetHostHCAs {
 		targetHosts = append(targetHosts, host)
 		sort.Strings(targetHostHCAs[host])
 	}
 	sort.Strings(targetHosts)
-	
+
 	// Calculate column widths
 	hostColWidth := 10 // Minimum width for hostname column
 	for _, host := range sourceHosts {
@@ -444,7 +444,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 			hostColWidth = 20
 		}
 	}
-	
+
 	hcaColWidth := 10 // Minimum width for HCA column
 	for _, hcas := range sourceHostHCAs {
 		for _, hca := range hcas {
@@ -455,20 +455,20 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 			}
 		}
 	}
-	
+
 	valueColWidth := 12 // Width for latency values (e.g., "123.45 μs")
-	
+
 	// Print title
 	fmt.Println("\n" + strings.Repeat("=", 80))
 	fmt.Println("📊 Latency Matrix (Average Latency in microseconds)")
 	fmt.Println(strings.Repeat("=", 80))
-	
+
 	// Count total target columns
 	totalTargetCols := 0
 	for _, host := range targetHosts {
 		totalTargetCols += len(targetHostHCAs[host])
 	}
-	
+
 	// Print top border
 	fmt.Printf("┌%s┬%s┬",
 		strings.Repeat("─", hostColWidth+2),
@@ -482,7 +482,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 			fmt.Printf("%s┐\n", strings.Repeat("─", width))
 		}
 	}
-	
+
 	// Print first header row (target hostnames)
 	fmt.Printf("│%*s│%*s│",
 		hostColWidth+2, " ",
@@ -500,7 +500,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 			fmt.Printf(" %-*s │\n", width, displayHost)
 		}
 	}
-	
+
 	// Print separator between hostname row and HCA row
 	fmt.Printf("│%*s│%*s├",
 		hostColWidth+2, " ",
@@ -519,7 +519,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 			}
 		}
 	}
-	
+
 	// Print second header row (target HCAs)
 	fmt.Printf("│%*s│%*s│",
 		hostColWidth+2, " ",
@@ -538,7 +538,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 			}
 		}
 	}
-	
+
 	// Print header separator
 	fmt.Printf("├%s┼%s┼",
 		strings.Repeat("─", hostColWidth+2),
@@ -550,7 +550,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 			fmt.Printf("%s┤\n", strings.Repeat("─", valueColWidth+2))
 		}
 	}
-	
+
 	// Print data rows
 	rowIdx := 0
 	for _, sourceHost := range sourceHosts {
@@ -566,14 +566,14 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 			} else {
 				fmt.Printf("│%*s│", hostColWidth+2, " ")
 			}
-			
+
 			// Print HCA in second column
 			displayHCA := sourceHCA
 			if len(sourceHCA) > hcaColWidth {
 				displayHCA = sourceHCA[:hcaColWidth-2] + ".."
 			}
 			fmt.Printf(" %-*s │", hcaColWidth, displayHCA)
-			
+
 			// Print latency values
 			for _, targetHost := range targetHosts {
 				targetHCAs := targetHostHCAs[targetHost]
@@ -581,7 +581,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 					sourceKey := fmt.Sprintf("%s:%s", sourceHost, sourceHCA)
 					targetKey := fmt.Sprintf("%s:%s", targetHost, targetHCA)
 					latency := matrix[sourceKey][targetKey]
-					
+
 					if latency > 0 {
 						valueStr := fmt.Sprintf("%.2f μs", latency)
 						fmt.Printf(" %*s │", valueColWidth, valueStr)
@@ -591,14 +591,14 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 				}
 			}
 			fmt.Println()
-			
+
 			rowIdx++
-			
+
 			// Print row separator
 			needsSeparator := false
 			isLastHCAOfHost := hcaIdx == len(sourceHCAs)-1
 			isLastHost := sourceHost == sourceHosts[len(sourceHosts)-1]
-			
+
 			if !isLastHost || !isLastHCAOfHost {
 				if isLastHCAOfHost {
 					// Separator between different hosts (with left border crossing hostname column)
@@ -613,7 +613,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 						strings.Repeat("─", hcaColWidth+2))
 					needsSeparator = true
 				}
-				
+
 				if needsSeparator {
 					for i := 0; i < totalTargetCols; i++ {
 						if i < totalTargetCols-1 {
@@ -626,7 +626,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 			}
 		}
 	}
-	
+
 	// Print bottom border
 	fmt.Printf("└%s┴%s┴",
 		strings.Repeat("─", hostColWidth+2),
@@ -638,7 +638,7 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 			fmt.Printf("%s┘\n", strings.Repeat("─", valueColWidth+2))
 		}
 	}
-	
+
 	// Calculate and display statistics
 	var allLatencies []float64
 	for _, data := range latencyData {
