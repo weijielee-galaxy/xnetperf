@@ -19,6 +19,7 @@ var latCmd = &cobra.Command{
 	Short: "Execute latency testing workflow with N×N matrix results",
 	Long: `Execute the latency testing workflow for measuring network latency between all HCA pairs:
 
+0. Precheck - Verify network card status on all hosts
 1. Generate latency test scripts using ib_write_lat (instead of ib_write_bw)
 2. Run latency tests
 3. Monitor test progress
@@ -51,6 +52,14 @@ func runLat(cmd *cobra.Command, args []string) {
 		fmt.Printf("❌ Error loading config: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Step 0: Precheck - Verify network card status before starting tests
+	fmt.Println("\n🔍 Step 0/5: Performing network card precheck...")
+	if !execPrecheckCommand(cfg) {
+		fmt.Printf("❌ Precheck failed! Network cards are not ready. Please fix the issues before running latency tests.\n")
+		os.Exit(1)
+	}
+	fmt.Println("✅ Precheck passed! All network cards are healthy. Proceeding with latency tests...")
 
 	// Step 1: Generate latency scripts
 	fmt.Println("\n📋 Step 1/5: Generating latency test scripts...")

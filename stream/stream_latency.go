@@ -3,40 +3,66 @@ package stream
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"xnetperf/config"
 )
 
+// getLatencyOutputDir returns the output directory for latency tests
+func getLatencyOutputDir(cfg *config.Config) string {
+	return fmt.Sprintf("%s_latency", cfg.OutputBase)
+}
+
+// clearLatencyScriptDir clears the latency script directory
+func clearLatencyScriptDir(cfg *config.Config) {
+	dir := getLatencyOutputDir(cfg)
+	fmt.Printf("Clearing latency script directory: %s\n", dir)
+
+	// Remove directory if it exists
+	if _, err := os.Stat(dir); err == nil {
+		if err := os.RemoveAll(dir); err != nil {
+			fmt.Printf("Warning: Failed to remove directory %s: %v\n", dir, err)
+		}
+	}
+
+	// Create fresh directory
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		fmt.Printf("Warning: Failed to create directory %s: %v\n", dir, err)
+	}
+
+	fmt.Printf("Cleared latency script directory: %s\n", dir)
+}
+
 // GenerateLatencyScripts generates N×N latency test scripts for full-mesh topology
 // Each HCA on each host will test latency to every other HCA on every other host
 func GenerateLatencyScripts(cfg *config.Config) error {
-	// Validate configuration
+	// Always show what stream_type is configured, but continue anyway
 	if cfg.StreamType != "fullmesh" {
-		fmt.Printf("⚠️  Warning: Latency testing currently only supports fullmesh mode. Current mode: %s\n", cfg.StreamType)
-		fmt.Println("Continuing with latency test generation...")
+		fmt.Printf("⚠️  Note: Config stream_type is '%s', but latency testing uses full-mesh topology\n", cfg.StreamType)
 	}
 
-	// Clear script directory
-	ClearStreamScriptDir(cfg)
+	// Clear latency script directory
+	clearLatencyScriptDir(cfg)
 
 	// Calculate total ports needed for N×N testing
 	allHosts := append(cfg.Server.Hostname, cfg.Client.Hostname...)
 	totalPorts := calculateTotalLatencyPorts(allHosts, cfg.Client.Hca)
 
-	fmt.Printf("Total ports needed for latency testing: %d\n", totalPorts)
-	if totalPorts > (65535 - cfg.StartPort + 1) {
-		return fmt.Errorf("not enough ports available. Required: %d, Available: %d",
-			totalPorts, 65535-cfg.StartPort+1)
-	}
+	fmt.Printf("Total latency ports needed: %d (from %d to %d)\n",
+		totalPorts, cfg.StartPort, cfg.StartPort+totalPorts-1)
 
-	// Generate scripts for each host
-	for _, host := range allHosts {
-		if err := generateLatencyScriptsForHost(host, allHosts, cfg); err != nil {
-			return fmt.Errorf("failed to generate scripts for host %s: %v", host, err)
+	// Generate scripts for each host with global port counter
+	port := cfg.StartPort
+	for _, currentHost := range allHosts {
+		var err error
+		port, err = generateLatencyScriptsForHost(currentHost, allHosts, cfg, port)
+		if err != nil {
+			return fmt.Errorf("failed to generate scripts for %s: %v", currentHost, err)
 		}
 	}
 
-	fmt.Printf("✅ Successfully generated latency test scripts in %s\n", cfg.OutputDir())
+	outputDir := getLatencyOutputDir(cfg)
+	fmt.Printf("✅ Successfully generated latency test scripts in %s\n", outputDir)
 	return nil
 }
 
@@ -51,43 +77,50 @@ func calculateTotalLatencyPorts(hosts []string, hcas []string) int {
 }
 
 // generateLatencyScriptsForHost generates server and client scripts for a specific host
-func generateLatencyScriptsForHost(currentHost string, allHosts []string, cfg *config.Config) error {
+// Returns the next available port number
+func generateLatencyScriptsForHost(currentHost string, allHosts []string, cfg *config.Config, startPort int) (int, error) {
 	// Get IP address for this host
 	output, err := getHostIP(currentHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
 	if err != nil {
-		return fmt.Errorf("failed to get IP for %s: %v\nOutput: %s", currentHost, err, string(output))
+		return startPort, fmt.Errorf("failed to get IP for %s: %v\nOutput: %s", currentHost, err, string(output))
 	}
 	currentHostIP := strings.TrimSpace(string(output))
 	fmt.Printf("Host %s IP: %s\n", currentHost, currentHostIP)
 
 	// Generate scripts for each HCA on this host
+	port := startPort
 	for _, currentHCA := range cfg.Client.Hca {
-		if err := generateLatencyScriptForHCA(
-			currentHost, currentHostIP, currentHCA, allHosts, cfg,
-		); err != nil {
-			return fmt.Errorf("failed to generate scripts for HCA %s on %s: %v",
+		var err error
+		port, err = generateLatencyScriptForHCA(
+			currentHost, currentHostIP, currentHCA, allHosts, cfg, port,
+		)
+		if err != nil {
+			return port, fmt.Errorf("failed to generate scripts for HCA %s on %s: %v",
 				currentHCA, currentHost, err)
 		}
 	}
 
-	return nil
+	return port, nil
 }
 
 // generateLatencyScriptForHCA generates server and client scripts for a specific HCA
+// Returns the next available port number
 func generateLatencyScriptForHCA(
 	currentHost, currentHostIP, currentHCA string,
 	allHosts []string,
 	cfg *config.Config,
-) error {
+	startPort int,
+) (int, error) {
 	serverScriptContent := strings.Builder{}
 	clientScriptContent := strings.Builder{}
 
+	outputDir := getLatencyOutputDir(cfg)
 	serverScriptFileName := fmt.Sprintf("%s/%s_%s_server_latency.sh",
-		cfg.OutputDir(), currentHost, currentHCA)
+		outputDir, currentHost, currentHCA)
 	clientScriptFileName := fmt.Sprintf("%s/%s_%s_client_latency.sh",
-		cfg.OutputDir(), currentHost, currentHCA)
+		outputDir, currentHost, currentHCA)
 
-	port := cfg.StartPort
+	port := startPort
 
 	// Generate commands for testing to all other hosts
 	for _, targetHost := range allHosts {
@@ -139,22 +172,35 @@ func generateLatencyScriptForHCA(
 
 	// Write server script file
 	if err := os.WriteFile(serverScriptFileName, []byte(serverScriptContent.String()), 0755); err != nil {
-		return fmt.Errorf("failed to write server script %s: %v", serverScriptFileName, err)
+		return port, fmt.Errorf("failed to write server script %s: %v", serverScriptFileName, err)
 	}
 
 	// Write client script file
 	if err := os.WriteFile(clientScriptFileName, []byte(clientScriptContent.String()), 0755); err != nil {
-		return fmt.Errorf("failed to write client script %s: %v", clientScriptFileName, err)
+		return port, fmt.Errorf("failed to write client script %s: %v", clientScriptFileName, err)
 	}
 
-	fmt.Printf("✅ Generated latency scripts for %s:%s\n", currentHost, currentHCA)
-	return nil
+	fmt.Printf("✅ Generated latency scripts for %s:%s (ports %d-%d)\n",
+		currentHost, currentHCA, startPort, port-1)
+
+	// Print first few lines of scripts for debugging
+	serverLines := strings.Split(serverScriptContent.String(), "\n")
+	if len(serverLines) > 0 {
+		fmt.Printf("   Server script preview (first command): %s\n", serverLines[0])
+	}
+	clientLines := strings.Split(clientScriptContent.String(), "\n")
+	if len(clientLines) > 0 {
+		fmt.Printf("   Client script preview (first command): %s\n", clientLines[0])
+	}
+
+	return port, nil
 }
 
 // RunLatencyScripts executes the latency test scripts with two-phase startup
 // Phase 1: Start all servers with a longer sleep for initialization
 // Phase 2: Start all clients after servers are ready
 func RunLatencyScripts(cfg *config.Config) error {
+	outputDir := getLatencyOutputDir(cfg)
 	fmt.Println("🚀 Starting latency test execution...")
 	fmt.Println("Phase 1: Starting all server processes...")
 
@@ -163,9 +209,9 @@ func RunLatencyScripts(cfg *config.Config) error {
 	for _, host := range allHosts {
 		for _, hca := range cfg.Client.Hca {
 			serverScript := fmt.Sprintf("%s/%s_%s_server_latency.sh",
-				cfg.OutputDir(), host, hca)
+				outputDir, host, hca)
 
-			fmt.Printf("  Starting server script: %s\n", serverScript)
+			fmt.Printf("  Executing: bash %s\n", serverScript)
 			if err := executeScript(serverScript); err != nil {
 				return fmt.Errorf("failed to execute server script %s: %v", serverScript, err)
 			}
@@ -182,9 +228,9 @@ func RunLatencyScripts(cfg *config.Config) error {
 	for _, host := range allHosts {
 		for _, hca := range cfg.Client.Hca {
 			clientScript := fmt.Sprintf("%s/%s_%s_client_latency.sh",
-				cfg.OutputDir(), host, hca)
+				outputDir, host, hca)
 
-			fmt.Printf("  Starting client script: %s\n", clientScript)
+			fmt.Printf("  Executing: bash %s\n", clientScript)
 			if err := executeScript(clientScript); err != nil {
 				return fmt.Errorf("failed to execute client script %s: %v", clientScript, err)
 			}
@@ -195,15 +241,27 @@ func RunLatencyScripts(cfg *config.Config) error {
 	return nil
 }
 
-// executeScript runs a shell script
+// executeScript runs a shell script using bash
 func executeScript(scriptPath string) error {
 	// Check if script exists
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 		return fmt.Errorf("script does not exist: %s", scriptPath)
 	}
 
-	// Execute the script using bash
-	// Note: The actual execution is handled by the workflow,
-	// here we just validate the script exists
+	// Print script path for debugging
+	fmt.Printf("    → Running: bash %s\n", scriptPath)
+
+	// Read script content
+	content, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return fmt.Errorf("failed to read script %s: %v", scriptPath, err)
+	}
+
+	// Execute via bash
+	cmd := exec.Command("bash", "-c", string(content))
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start script %s: %v", scriptPath, err)
+	}
+
 	return nil
 }
