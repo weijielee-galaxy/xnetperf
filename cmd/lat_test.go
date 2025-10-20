@@ -266,21 +266,21 @@ func TestCollectLatencyReportData(t *testing.T) {
 	}{
 		{
 			filename: "latency_c_host1_mlx5_0_to_host2_mlx5_1_p20000.json",
-			content: LatencyReport{Results: []struct {
+			content: LatencyReport{Results: struct {
 				TAvg float64 `json:"t_avg"`
-			}{{TAvg: 1.5}}},
+			}{TAvg: 1.5}},
 		},
 		{
 			filename: "latency_c_host2_mlx5_1_to_host1_mlx5_0_p20001.json",
-			content: LatencyReport{Results: []struct {
+			content: LatencyReport{Results: struct {
 				TAvg float64 `json:"t_avg"`
-			}{{TAvg: 2.3}}},
+			}{TAvg: 2.3}},
 		},
 		{
 			filename: "latency_s_host1_mlx5_0_from_host2_mlx5_1_p20000.json", // Should be skipped
-			content: LatencyReport{Results: []struct {
+			content: LatencyReport{Results: struct {
 				TAvg float64 `json:"t_avg"`
-			}{{TAvg: 1.0}}},
+			}{TAvg: 1.0}},
 		},
 	}
 

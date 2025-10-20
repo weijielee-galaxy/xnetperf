@@ -243,7 +243,7 @@ type LatencyData struct {
 
 // LatencyReport represents the JSON structure from ib_write_lat
 type LatencyReport struct {
-	Results []struct {
+	Results struct {
 		TAvg float64 `json:"t_avg"` // Average latency in microseconds
 	} `json:"results"`
 }
@@ -343,12 +343,7 @@ func parseLatencyReport(filePath string) (*LatencyData, error) {
 		return nil, fmt.Errorf("failed to unmarshal JSON: %v", err)
 	}
 
-	// Extract average latency from results
-	if len(report.Results) == 0 {
-		return nil, fmt.Errorf("no results found in report")
-	}
-
-	avgLatency := report.Results[0].TAvg
+	avgLatency := report.Results.TAvg
 
 	latencyData := &LatencyData{
 		SourceHost:   sourceHost,
