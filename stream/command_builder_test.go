@@ -613,3 +613,225 @@ func TestRdmaCmWithOtherFlags(t *testing.T) {
 		t.Error("Expected -b flag to appear before -R flag in command")
 	}
 }
+
+// TestForLatencyTest tests the latency test mode
+func TestForLatencyTest(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder()
+
+	// Test chaining
+	result := builder.ForLatencyTest(true)
+	if result != builder {
+		t.Error("ForLatencyTest should return the same builder instance for chaining")
+	}
+
+	// Test latencyTest field is set
+	if !builder.latencyTest {
+		t.Error("latencyTest field should be true")
+	}
+
+	// Test disabling latency test
+	builder.ForLatencyTest(false)
+	if builder.latencyTest {
+		t.Error("latencyTest field should be false")
+	}
+}
+
+// TestLatencyTestCommand tests ib_write_lat command generation
+func TestLatencyTestCommand(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder()
+	builder.Host("test-host").
+		Device("mlx5_0").
+		Port(20000).
+		ForLatencyTest(true).
+		RunInfinitely(false).
+		DurationSeconds(5)
+
+	cmd := builder.String()
+
+	// Should use ib_write_lat instead of ib_write_bw
+	if !strings.Contains(cmd, "ib_write_lat") {
+		t.Error("Command should contain 'ib_write_lat'")
+	}
+	if strings.Contains(cmd, "ib_write_bw") {
+		t.Error("Command should not contain 'ib_write_bw'")
+	}
+
+	// Should contain duration
+	if !strings.Contains(cmd, " -D 5") {
+		t.Error("Command should contain -D 5 for duration")
+	}
+
+	// Should NOT contain queue pair or message size parameters
+	if strings.Contains(cmd, " -q ") {
+		t.Error("Latency command should not contain -q flag")
+	}
+	if strings.Contains(cmd, " -m ") {
+		t.Error("Latency command should not contain -m flag")
+	}
+}
+
+// TestLatencyTestWithReport tests latency test with JSON report output
+func TestLatencyTestWithReport(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder()
+	builder.Host("test-host").
+		Device("mlx5_0").
+		Port(20000).
+		ForLatencyTest(true).
+		RunInfinitely(false).
+		DurationSeconds(5).
+		Report(true).
+		OutputFileName("latency_report.json")
+
+	cmd := builder.String()
+
+	// Should contain --output-format json
+	if !strings.Contains(cmd, "--output-format json") {
+		t.Error("Latency command should contain '--output-format json'")
+	}
+
+	// Should contain output file
+	if !strings.Contains(cmd, "--out_json_file latency_report.json") {
+		t.Error("Latency command should contain '--out_json_file latency_report.json'")
+	}
+
+	// Should NOT contain --report_gbits (bandwidth-specific)
+	if strings.Contains(cmd, "--report_gbits") {
+		t.Error("Latency command should not contain '--report_gbits'")
+	}
+}
+
+// TestLatencyTestServerCommand tests latency server command
+func TestLatencyTestServerCommand(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder()
+	builder.Host("server-host").
+		Device("mlx5_0").
+		Port(20000).
+		ForLatencyTest(true).
+		RunInfinitely(false).
+		DurationSeconds(5).
+		ServerCommand()
+
+	cmd := builder.String()
+
+	// Should use ib_write_lat
+	if !strings.Contains(cmd, "ib_write_lat") {
+		t.Error("Command should contain 'ib_write_lat'")
+	}
+
+	// Should not contain target IP (server mode)
+	if strings.Contains(cmd, "192.168") {
+		t.Error("Server command should not contain target IP")
+	}
+}
+
+// TestLatencyTestClientCommand tests latency client command
+func TestLatencyTestClientCommand(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder()
+	builder.Host("client-host").
+		Device("mlx5_0").
+		Port(20000).
+		ForLatencyTest(true).
+		RunInfinitely(false).
+		DurationSeconds(5).
+		TargetIP("192.168.1.100").
+		ClientCommand()
+
+	cmd := builder.String()
+
+	// Should use ib_write_lat
+	if !strings.Contains(cmd, "ib_write_lat") {
+		t.Error("Command should contain 'ib_write_lat'")
+	}
+
+	// Should contain target IP (client mode)
+	if !strings.Contains(cmd, "192.168.1.100") {
+		t.Error("Client command should contain target IP")
+	}
+
+	// Should have appropriate sleep time for client
+	if !strings.Contains(cmd, "sleep 0.06") {
+		t.Error("Client command should have sleep 0.06")
+	}
+}
+
+// TestLatencyTestWithSSHKey tests latency command with SSH private key
+func TestLatencyTestWithSSHKey(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder()
+	builder.Host("test-host").
+		Device("mlx5_0").
+		Port(20000).
+		ForLatencyTest(true).
+		RunInfinitely(false).
+		DurationSeconds(5).
+		SSHPrivateKey("/path/to/key.pem")
+
+	cmd := builder.String()
+
+	// Should contain SSH with private key
+	if !strings.Contains(cmd, "ssh -i /path/to/key.pem test-host") {
+		t.Error("Command should contain 'ssh -i /path/to/key.pem test-host'")
+	}
+
+	// Should contain ib_write_lat
+	if !strings.Contains(cmd, "ib_write_lat") {
+		t.Error("Command should contain 'ib_write_lat'")
+	}
+}
+
+// TestLatencyTestWithGidIndex tests latency command with GID index
+func TestLatencyTestWithGidIndex(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder()
+	builder.Host("test-host").
+		Device("mlx5_0").
+		Port(20000).
+		ForLatencyTest(true).
+		RunInfinitely(false).
+		DurationSeconds(5).
+		GidIndex(3)
+
+	cmd := builder.String()
+
+	// Should contain GID index
+	if !strings.Contains(cmd, " -x 3") {
+		t.Error("Command should contain ' -x 3' for GID index")
+	}
+
+	// Should use ib_write_lat
+	if !strings.Contains(cmd, "ib_write_lat") {
+		t.Error("Command should contain 'ib_write_lat'")
+	}
+}
+
+// TestBandwidthTestStillWorks tests that bandwidth tests still work after adding latency support
+func TestBandwidthTestStillWorks(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder()
+	builder.Host("test-host").
+		Device("mlx5_0").
+		Port(20000).
+		RunInfinitely(false).
+		DurationSeconds(20).
+		QueuePairNum(10).
+		MessageSize(4096).
+		Report(true).
+		OutputFileName("bandwidth_report.json")
+
+	cmd := builder.String()
+
+	// Should use ib_write_bw
+	if !strings.Contains(cmd, "ib_write_bw") {
+		t.Error("Bandwidth command should contain 'ib_write_bw'")
+	}
+
+	// Should contain queue pair and message size
+	if !strings.Contains(cmd, " -q 10") {
+		t.Error("Bandwidth command should contain ' -q 10'")
+	}
+	if !strings.Contains(cmd, " -m 4096") {
+		t.Error("Bandwidth command should contain ' -m 4096'")
+	}
+
+	// Should contain bandwidth-specific report flags
+	if !strings.Contains(cmd, "--report_gbits") {
+		t.Error("Bandwidth command should contain '--report_gbits'")
+	}
+}
