@@ -3,7 +3,6 @@ package stream
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"xnetperf/config"
 )
@@ -23,11 +22,8 @@ func GenerateIncastScripts(cfg *config.Config) {
 	// 根据配置文件，生成在每个server的每个HCA上监听的脚本
 	port := cfg.StartPort
 	for _, sHost := range cfg.Server.Hostname {
-		command := fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1", "bond0")
-		// 2. Create the command to be executed locally: ssh <hostname> "<command>"
-		cmd := exec.Command("ssh", sHost, command)
 		// 3. Run the command and capture the combined output (stdout and stderr).
-		hostIP, err := cmd.CombinedOutput()
+		hostIP, err := getHostIP(sHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
 		if err != nil {
 			// If command fails, return the output for debugging and a detailed error.
 			fmt.Printf("Error executing command on %s: %v\nOutput: %s\n", sHost, err, string(hostIP))
@@ -53,8 +49,10 @@ func GenerateIncastScripts(cfg *config.Config) {
 						RunInfinitely(cfg.Run.Infinitely).
 						DurationSeconds(cfg.Run.DurationSeconds).
 						RdmaCm(cfg.RdmaCm).
+						GidIndex(cfg.GidIndex).
 						Report(cfg.Report.Enable).
 						OutputFileName(fmt.Sprintf("%s/report_s_%s_%s_%d.json", cfg.Report.Dir, sHost, sHca, port)).
+						SSHPrivateKey(cfg.SSH.PrivateKey).
 						ServerCommand() // 服务器命令不需要目标IP
 
 					// 使用命令构建器创建客户端命令
@@ -68,8 +66,10 @@ func GenerateIncastScripts(cfg *config.Config) {
 						RunInfinitely(cfg.Run.Infinitely).
 						DurationSeconds(cfg.Run.DurationSeconds).
 						RdmaCm(cfg.RdmaCm).
+						GidIndex(cfg.GidIndex).
 						Report(cfg.Report.Enable).
 						OutputFileName(fmt.Sprintf("%s/report_c_%s_%s_%d.json", cfg.Report.Dir, cHost, cHca, port)).
+						SSHPrivateKey(cfg.SSH.PrivateKey).
 						ClientCommand() // 客户端命令有更长的睡眠时间
 
 					serverScriptContent.WriteString(serverCmd.String() + "\n")

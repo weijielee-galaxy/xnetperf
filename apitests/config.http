@@ -1,0 +1,227 @@
+### HTTP Server API Tests
+### 使用 REST Client 插件测试 xnetperf HTTP API
+
+@baseUrl = http://localhost:8080
+@apiUrl = {{baseUrl}}/api
+
+###############################################################################
+### 1. 健康检查
+###############################################################################
+
+### Health Check
+GET {{baseUrl}}/health HTTP/1.1
+
+###############################################################################
+### 2. 配置文件列表
+###############################################################################
+
+### Get all config files
+GET {{apiUrl}}/configs HTTP/1.1
+
+###############################################################################
+### 3. 查看配置文件
+###############################################################################
+
+### Get default config
+GET {{apiUrl}}/configs/config.yaml HTTP/1.1
+
+### Get custom config
+GET {{apiUrl}}/configs/prod-config.yaml HTTP/1.1
+
+###############################################################################
+### 4. 创建配置文件
+###############################################################################
+
+### Create a new config file (with all fields)
+POST {{apiUrl}}/configs HTTP/1.1
+Content-Type: application/json
+
+{
+  "name": "test-config.yaml",
+  "config": {
+    "start_port": 20000,
+    "stream_type": "fullmesh",
+    "qp_num": 10,
+    "message_size_bytes": 8388608,
+    "output_base": "./generated_scripts",
+    "waiting_time_seconds": 15,
+    "speed": 400,
+    "rdma_cm": false,
+    "report": {
+      "enable": true,
+      "dir": "/root"
+    },
+    "run": {
+      "infinitely": true,
+      "duration_seconds": 10
+    },
+    "server": {
+      "hostname": ["server-001", "server-002"],
+      "hca": ["mlx5_0", "mlx5_1"]
+    },
+    "client": {
+      "hostname": ["client-001", "client-002"],
+      "hca": ["mlx5_0", "mlx5_1"]
+    }
+  }
+}
+
+### Create another config file (minimal fields, defaults will be applied)
+POST {{apiUrl}}/configs HTTP/1.1
+Content-Type: application/json
+
+{
+  "name": "prod-config.yaml",
+  "config": {
+    "stream_type": "p2p",
+    "server": {
+      "hostname": ["prod-server-001"],
+      "hca": ["mlx5_0"]
+    },
+    "client": {
+      "hostname": ["prod-client-001"],
+      "hca": ["mlx5_0"]
+    }
+  }
+}
+
+###############################################################################
+### 5. 更新配置文件
+###############################################################################
+
+### Update an existing config file (with all fields)
+PUT {{apiUrl}}/configs/prod-config.yaml HTTP/1.1
+Content-Type: application/json
+
+{
+  "start_port": 21000,
+  "stream_type": "incast",
+  "qp_num": 20,
+  "message_size_bytes": 16777216,
+  "output_base": "./generated_scripts",
+  "waiting_time_seconds": 20,
+  "speed": 200,
+  "rdma_cm": true,
+  "report": {
+    "enable": true,
+    "dir": "/tmp/reports"
+  },
+  "run": {
+    "infinitely": false,
+    "duration_seconds": 30
+  },
+  "server": {
+    "hostname": ["server-001", "server-002", "server-003"],
+    "hca": ["mlx5_0", "mlx5_1", "mlx5_2"]
+  },
+  "client": {
+    "hostname": ["client-001", "client-002"],
+    "hca": ["mlx5_0", "mlx5_1"]
+  }
+}
+
+### Update default config (should work, with all fields)
+PUT {{apiUrl}}/configs/config.yaml HTTP/1.1
+Content-Type: application/json
+
+{
+  "start_port": 20000,
+  "stream_type": "p2p",
+  "qp_num": 10,
+  "message_size_bytes": 4096,
+  "output_base": "./generated_scripts",
+  "waiting_time_seconds": 15,
+  "speed": 400,
+  "rdma_cm": false,
+  "report": {
+    "enable": true,
+    "dir": "/root"
+  },
+  "run": {
+    "infinitely": true,
+    "duration_seconds": 10
+  },
+  "server": {
+    "hostname": ["cetus-g88-094", "cetus-g88-065"],
+    "hca": ["mlx5_0", "mlx5_1"]
+  },
+  "client": {
+    "hostname": ["cetus-g88-061", "cetus-g88-062"],
+    "hca": ["mlx5_0", "mlx5_1"]
+  }
+}
+
+###############################################################################
+### 6. 删除配置文件
+###############################################################################
+
+### Delete a config file
+DELETE {{apiUrl}}/configs/test-config.yaml HTTP/1.1
+
+### Try to delete default config (should fail)
+DELETE {{apiUrl}}/configs/config.yaml HTTP/1.1
+
+###############################################################################
+### 7. 错误测试
+###############################################################################
+
+### Get non-existent config (should return 404)
+GET {{apiUrl}}/configs/nonexistent.yaml HTTP/1.1
+
+### Create config with invalid name (should fail)
+POST {{apiUrl}}/configs HTTP/1.1
+Content-Type: application/json
+
+{
+  "name": "invalid-config.txt",
+  "config": {
+    "start_port": 20000,
+    "stream_type": "p2p",
+    "qp_num": 10,
+    "message_size_bytes": 4096,
+    "output_base": "./generated_scripts",
+    "waiting_time_seconds": 15,
+    "speed": 400,
+    "rdma_cm": false,
+    "report": {
+      "enable": true,
+      "dir": "/root"
+    },
+    "run": {
+      "infinitely": false,
+      "duration_seconds": 10
+    },
+    "server": {
+      "hostname": ["server-001"],
+      "hca": ["mlx5_0"]
+    },
+    "client": {
+      "hostname": ["client-001"],
+      "hca": ["mlx5_0"]
+    }
+  }
+}
+
+### Create config with missing fields (should fail)
+POST {{apiUrl}}/configs HTTP/1.1
+Content-Type: application/json
+
+{
+  "name": "incomplete.yaml"
+}
+
+### Delete non-existent config (should return 404)
+DELETE {{apiUrl}}/configs/nonexistent.yaml HTTP/1.1
+
+###############################################################################
+### 8. 验证配置文件
+###############################################################################
+
+### Validate default config (should succeed)
+POST {{apiUrl}}/configs/config.yaml/validate HTTP/1.1
+
+### Validate custom config (should succeed)
+POST {{apiUrl}}/configs/test-config.yaml/validate HTTP/1.1
+
+### Validate non-existent config (should return 404)
+POST {{apiUrl}}/configs/nonexistent.yaml/validate HTTP/1.1

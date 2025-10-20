@@ -1,18 +1,24 @@
-start_port: 20000
-stream_type: "p2p" # "fullmesh" or "incast" or "p2p"
-qp_num: 10
-message_size_bytes: 4096
-output_base: "./generated_scripts"
-waiting_time_seconds: 15 # Time to wait before starting client scripts
-speed: 400 # in Gbps, used for theoretical bandwidth calculation
+start_port: 20000 # Starting port number for the servers, default is 20000
+stream_type: "p2p" # "fullmesh" or "incast" or "p2p", default is "incast"
+qp_num: 10 # Number of Queue Pairs per client-server pair, default is 10
+message_size_bytes: 4096 # Message size in bytes, default is 4096
+output_base: "./generated_scripts" # default is "./generated_scripts"
+waiting_time_seconds: 15 # Time to wait before starting client scripts, default is 15
+speed: 400 # in Gbps, used for theoretical bandwidth calculation, default is 400
+rdma_cm: false # Whether to use RDMA CM for connection management, default is false
+gid_index: 3 # GID index to use for RoCEv2, default is 3
+network_interface : "bond0" # Network interface name for IP detection, default is "bond0"
 
 report:
-  enable: true
-  dir: "/root"
+  enable: true # Whether to enable report generation, default is true
+  dir: "/root" # Directory to save reports, default is "/root"
 
 run:
-  infinitely: true
-  duration_seconds: 10
+  infinitely: true # Whether to run the test infinitely, default is false
+  duration_seconds: 10 # Duration of the test in seconds if not running infinitely, default is 10
+
+ssh:
+  private_key: "~/.ssh/id_rsa" # Path to the SSH private key for authentication, default is "~/.ssh/id_rsa"
 
 server:
   hostname:

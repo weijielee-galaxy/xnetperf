@@ -19,10 +19,12 @@ type IBWriteBWCommandBuilder struct {
 	background      bool
 	sleepTime       string
 	sshWrapper      bool
+	sshPrivateKey   string // SSH private key path
 	report          bool
 	outputFileName  string
 	bidirectional   bool // 新增双向测试参数
 	rdmaCm          bool // RDMA CM参数
+	gidIndex        int  // GID index for RoCE v2
 }
 
 // NewIBWriteBWCommandBuilder creates a new command builder
@@ -108,6 +110,12 @@ func (b *IBWriteBWCommandBuilder) SSHWrapper(enable bool) *IBWriteBWCommandBuild
 	return b
 }
 
+// SSHPrivateKey sets the SSH private key path
+func (b *IBWriteBWCommandBuilder) SSHPrivateKey(keyPath string) *IBWriteBWCommandBuilder {
+	b.sshPrivateKey = keyPath
+	return b
+}
+
 // Report sets whether to enable report generation
 func (b *IBWriteBWCommandBuilder) Report(enable bool) *IBWriteBWCommandBuilder {
 	b.report = enable
@@ -132,6 +140,12 @@ func (b *IBWriteBWCommandBuilder) RdmaCm(enable bool) *IBWriteBWCommandBuilder {
 	return b
 }
 
+// GidIndex sets the GID index for RoCE v2 (adds -x flag)
+func (b *IBWriteBWCommandBuilder) GidIndex(index int) *IBWriteBWCommandBuilder {
+	b.gidIndex = index
+	return b
+}
+
 // String builds and returns the complete command string
 func (b *IBWriteBWCommandBuilder) String() string {
 	// Validate that outputFileName is provided when report is enabled and not running infinitely
@@ -142,7 +156,11 @@ func (b *IBWriteBWCommandBuilder) String() string {
 	var cmd strings.Builder
 
 	if b.sshWrapper {
-		cmd.WriteString(fmt.Sprintf("ssh %s '", b.host))
+		if b.sshPrivateKey != "" {
+			cmd.WriteString(fmt.Sprintf("ssh -i %s %s '", b.sshPrivateKey, b.host))
+		} else {
+			cmd.WriteString(fmt.Sprintf("ssh %s '", b.host))
+		}
 	}
 
 	cmd.WriteString("ib_write_bw")
@@ -175,6 +193,10 @@ func (b *IBWriteBWCommandBuilder) String() string {
 
 	if b.rdmaCm {
 		cmd.WriteString(" -R")
+	}
+
+	if b.gidIndex > 0 {
+		cmd.WriteString(fmt.Sprintf(" -x %d", b.gidIndex))
 	}
 
 	if b.targetIP != "" {

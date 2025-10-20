@@ -31,14 +31,8 @@ func GenerateFullMeshScript(cfg *config.Config) {
 
 	for _, Server := range allServerHostName {
 		port := cfg.StartPort
-		// ip addr show bond0 | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1
-		command := fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1", "bond0")
-
-		// 2. Create the command to be executed locally: ssh <hostname> "<command>"
-		cmd := exec.Command("ssh", Server, command)
-
 		// 3. Run the command and capture the combined output (stdout and stderr).
-		output, err := cmd.CombinedOutput()
+		output, err := getHostIP(Server, cfg.SSH.PrivateKey, cfg.NetworkInterface)
 		if err != nil {
 			// If command fails, return the output for debugging and a detailed error.
 			fmt.Printf("Error executing command on %s: %v\nOutput: %s\n", Server, err, string(output))
@@ -70,11 +64,14 @@ func GenerateFullMeshScript(cfg *config.Config) {
 						Device(hcaServer).
 						MessageSize(cfg.MessageSizeBytes).
 						Port(port).
+						QueuePairNum(cfg.QpNum).
 						RunInfinitely(cfg.Run.Infinitely).
 						DurationSeconds(cfg.Run.DurationSeconds).
 						RdmaCm(cfg.RdmaCm).
+						GidIndex(cfg.GidIndex).
 						Report(cfg.Report.Enable).
 						OutputFileName(fmt.Sprintf("%s/report_s_%s_%s_%d.json", cfg.Report.Dir, Server, hcaServer, port)).
+						SSHPrivateKey(cfg.SSH.PrivateKey).
 						ServerCommand() // 服务器命令不需要目标IP
 
 					// 使用命令构建器创建客户端命令
@@ -83,12 +80,15 @@ func GenerateFullMeshScript(cfg *config.Config) {
 						Device(hcaClient).
 						MessageSize(cfg.MessageSizeBytes).
 						Port(port).
+						QueuePairNum(cfg.QpNum).
 						TargetIP(strings.TrimSpace(string(output))).
 						RunInfinitely(cfg.Run.Infinitely).
 						DurationSeconds(cfg.Run.DurationSeconds).
 						RdmaCm(cfg.RdmaCm).
+						GidIndex(cfg.GidIndex).
 						Report(cfg.Report.Enable).
 						OutputFileName(fmt.Sprintf("%s/report_c_%s_%s_%d.json", cfg.Report.Dir, allHost, hcaClient, port)).
+						SSHPrivateKey(cfg.SSH.PrivateKey).
 						ClientCommand() // 客户端命令有更长的睡眠时间
 
 					serverScriptContent.WriteString(serverCmd.String() + "\n")
@@ -114,7 +114,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 	}
 }
 
-func ClearPreviewScript(hosts []string) {
+func ClearPreviewScript(hosts []string, sshKeyPath string) {
 	var wg sync.WaitGroup
 
 	for _, host := range hosts {
@@ -131,7 +131,7 @@ func ClearPreviewScript(hosts []string) {
 			fmt.Printf("-> Sending command to %s...\n", hostname)
 
 			// Create the command: ssh <hostname> "killall ib_write_bw"
-			cmd := exec.Command("ssh", hostname, "killall ib_write_bw")
+			cmd := buildSSHCommand(hostname, "killall ib_write_bw", sshKeyPath)
 
 			// Run the command and capture the combined standard output and standard error.
 			output, err := cmd.CombinedOutput()
@@ -166,7 +166,7 @@ func DistributeAndRunScripts(cfg *config.Config) {
 	fmt.Println("Distributing and running scripts...")
 	allServerHostName := append(cfg.Server.Hostname, cfg.Client.Hostname...)
 	fmt.Println(allServerHostName)
-	ClearPreviewScript(allServerHostName)
+	ClearPreviewScript(allServerHostName, cfg.SSH.PrivateKey)
 
 	// 这里是分发和启动脚本的逻辑
 	fmt.Println("Distributing and running scripts...")
@@ -298,4 +298,28 @@ func executeRemoteScript(hostname string, scriptContent []byte) error {
 		return fmt.Errorf("failed to execute script on %s: %w", hostname, err)
 	}
 	return nil
+}
+
+func GenerateScripts(cfg *config.Config) error {
+	fmt.Println("Generating scripts based on stream type:", cfg.StreamType)
+	switch cfg.StreamType {
+	case config.FullMesh:
+		GenerateFullMeshScript(cfg)
+		return nil
+	case config.InCast:
+		GenerateIncastScripts(cfg)
+		return nil
+	case config.P2P:
+		err := GenerateP2PScripts(cfg)
+		if err != nil {
+			fmt.Printf("❌ Error generating P2P scripts: %v\n", err)
+			return err
+		}
+		return nil
+	case config.LocalTest:
+		GenerateLocaltestScript(cfg)
+		return nil
+	default:
+		return fmt.Errorf("invalid stream_type '%s' in config", cfg.StreamType)
+	}
 }

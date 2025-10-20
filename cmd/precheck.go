@@ -23,15 +23,24 @@ const (
 
 // PrecheckResult 表示预检查结果
 type PrecheckResult struct {
-	Hostname  string
-	HCA       string
-	PhysState string
-	State     string
-	Speed     string
-	FwVer     string
-	BoardId   string
-	IsHealthy bool
-	Error     string
+	Hostname     string
+	HCA          string
+	PhysState    string
+	State        string
+	Speed        string
+	FwVer        string
+	BoardId      string
+	SerialNumber string
+	IsHealthy    bool
+	Error        string
+}
+
+// buildSSHCommand builds an ssh command with optional private key
+func buildSSHCommand(hostname, remoteCmd, sshKeyPath string) *exec.Cmd {
+	if sshKeyPath != "" {
+		return exec.Command("ssh", "-i", sshKeyPath, hostname, remoteCmd)
+	}
+	return exec.Command("ssh", hostname, remoteCmd)
 }
 
 var precheckCmd = &cobra.Command{
@@ -106,7 +115,7 @@ func execPrecheckCommand(cfg *config.Config) bool {
 	fmt.Printf("Checking %d HCAs across all hosts...\n\n", len(checkItems))
 
 	// 并发执行检查
-	results := precheckAllHCAs(checkItems)
+	results := precheckAllHCAs(checkItems, cfg.SSH.PrivateKey)
 
 	// 显示结果
 	displayPrecheckResults(results)
@@ -142,7 +151,7 @@ func execPrecheckCommand(cfg *config.Config) bool {
 func precheckAllHCAs(checkItems []struct {
 	hostname string
 	hca      string
-}) []PrecheckResult {
+}, sshKeyPath string) []PrecheckResult {
 	var results []PrecheckResult
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -151,7 +160,7 @@ func precheckAllHCAs(checkItems []struct {
 		wg.Add(1)
 		go func(hostname, hca string) {
 			defer wg.Done()
-			result := precheckHCA(hostname, hca)
+			result := precheckHCA(hostname, hca, sshKeyPath)
 
 			mu.Lock()
 			results = append(results, result)
@@ -163,7 +172,7 @@ func precheckAllHCAs(checkItems []struct {
 	return results
 }
 
-func precheckHCA(hostname, hca string) PrecheckResult {
+func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 	result := PrecheckResult{
 		Hostname: hostname,
 		HCA:      hca,
@@ -171,7 +180,7 @@ func precheckHCA(hostname, hca string) PrecheckResult {
 
 	// 检查物理状态
 	physStateCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/ports/1/phys_state", hca)
-	cmd := exec.Command("ssh", hostname, physStateCmd)
+	cmd := buildSSHCommand(hostname, physStateCmd, sshKeyPath)
 	physOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -181,7 +190,7 @@ func precheckHCA(hostname, hca string) PrecheckResult {
 
 	// 检查逻辑状态
 	stateCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/ports/1/state", hca)
-	cmd = exec.Command("ssh", hostname, stateCmd)
+	cmd = buildSSHCommand(hostname, stateCmd, sshKeyPath)
 	stateOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -191,7 +200,7 @@ func precheckHCA(hostname, hca string) PrecheckResult {
 
 	// 检查网卡速度
 	speedCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/ports/1/rate", hca)
-	cmd = exec.Command("ssh", hostname, speedCmd)
+	cmd = buildSSHCommand(hostname, speedCmd, sshKeyPath)
 	speedOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -201,7 +210,7 @@ func precheckHCA(hostname, hca string) PrecheckResult {
 
 	// 检查固件版本
 	fwVerCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/fw_ver", hca)
-	cmd = exec.Command("ssh", hostname, fwVerCmd)
+	cmd = buildSSHCommand(hostname, fwVerCmd, sshKeyPath)
 	fwVerOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -211,11 +220,21 @@ func precheckHCA(hostname, hca string) PrecheckResult {
 
 	// 检查板卡ID
 	boardIdCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/board_id", hca)
-	cmd = exec.Command("ssh", hostname, boardIdCmd)
+	cmd = buildSSHCommand(hostname, boardIdCmd, sshKeyPath)
 	boardIdOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
 		result.Error = fmt.Sprintf("Failed to check board_id: %v", err)
+		return result
+	}
+
+	// 检查系统序列号
+	serialNumberCmd := "cat /sys/class/dmi/id/product_serial"
+	cmd = buildSSHCommand(hostname, serialNumberCmd, sshKeyPath)
+	serialNumberOutput, err := cmd.CombinedOutput()
+
+	if err != nil {
+		result.Error = fmt.Sprintf("Failed to check serial number: %v", err)
 		return result
 	}
 
@@ -225,6 +244,15 @@ func precheckHCA(hostname, hca string) PrecheckResult {
 	speedStr := strings.TrimSpace(string(speedOutput))
 	fwVerStr := strings.TrimSpace(string(fwVerOutput))
 	boardIdStr := strings.TrimSpace(string(boardIdOutput))
+	serialNumberStr := strings.TrimSpace(string(serialNumberOutput))
+
+	// 处理Serial Number：如果包含-则按-分割获取最后一个值
+	if strings.Contains(serialNumberStr, "-") {
+		parts := strings.Split(serialNumberStr, "-")
+		if len(parts) > 0 {
+			serialNumberStr = parts[len(parts)-1]
+		}
+	}
 
 	// 去掉状态前面的数字和冒号，只保留有意义的文本
 	result.PhysState = cleanStateString(physStateStr)
@@ -232,6 +260,7 @@ func precheckHCA(hostname, hca string) PrecheckResult {
 	result.Speed = speedStr // 保持速度信息的原始格式
 	result.FwVer = fwVerStr
 	result.BoardId = boardIdStr
+	result.SerialNumber = serialNumberStr
 
 	// 判断是否健康：需要同时满足 LinkUp 和 ACTIVE
 	isLinkUp := strings.Contains(physStateStr, "LinkUp")
@@ -353,6 +382,7 @@ func displayPrecheckResults(results []PrecheckResult) {
 	maxSpeedWidth := len("Speed")
 	maxFwVerWidth := len("FW Version")
 	maxBoardIdWidth := len("Board ID")
+	maxSerialNumberWidth := len("Serial Number")
 	maxStatusWidth := len("Status")
 
 	for _, result := range results {
@@ -376,6 +406,9 @@ func displayPrecheckResults(results []PrecheckResult) {
 		}
 		if len(result.BoardId) > maxBoardIdWidth {
 			maxBoardIdWidth = len(result.BoardId)
+		}
+		if len(result.SerialNumber) > maxSerialNumberWidth {
+			maxSerialNumberWidth = len(result.SerialNumber)
 		}
 
 		// 计算状态文本长度，包含符号前缀（不含颜色代码）
@@ -414,18 +447,22 @@ func displayPrecheckResults(results []PrecheckResult) {
 	if maxBoardIdWidth < 15 {
 		maxBoardIdWidth = 15
 	}
+	if maxSerialNumberWidth < 15 {
+		maxSerialNumberWidth = 15
+	}
 	if maxStatusWidth < 10 {
 		maxStatusWidth = 10
 	}
 
-	// 生成表格格式（8列：Hostname, HCA, Physical State, Logical State, Speed, FW Version, Board ID, Status）
-	headerFormat := fmt.Sprintf("│ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │\n",
-		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxSpeedWidth, maxFwVerWidth, maxBoardIdWidth, maxStatusWidth)
-	separatorFormat := fmt.Sprintf("├─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┤\n",
-		maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxSpeedWidth, maxFwVerWidth, maxBoardIdWidth, maxStatusWidth)
+	// 生成表格格式（9列：Serial Number, Hostname, HCA, Physical State, Logical State, Speed, FW Version, Board ID, Status）
+	headerFormat := fmt.Sprintf("│ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │ %%-%ds │\n",
+		maxSerialNumberWidth, maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxSpeedWidth, maxFwVerWidth, maxBoardIdWidth, maxStatusWidth)
+	separatorFormat := fmt.Sprintf("├─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┼─%%-%ds─┤\n",
+		maxSerialNumberWidth, maxHostnameWidth, maxHCAWidth, maxPhysStateWidth, maxStateWidth, maxSpeedWidth, maxFwVerWidth, maxBoardIdWidth, maxStatusWidth)
 
 	// 生成边框
-	topBorder := fmt.Sprintf("┌─%s─┬─%s─┬─%s─┬─%s─┬─%s─┬─%s─┬─%s─┬─%s─┐\n",
+	topBorder := fmt.Sprintf("┌─%s─┬─%s─┬─%s─┬─%s─┬─%s─┬─%s─┬─%s─┬─%s─┬─%s─┐\n",
+		strings.Repeat("─", maxSerialNumberWidth),
 		strings.Repeat("─", maxHostnameWidth),
 		strings.Repeat("─", maxHCAWidth),
 		strings.Repeat("─", maxPhysStateWidth),
@@ -434,7 +471,8 @@ func displayPrecheckResults(results []PrecheckResult) {
 		strings.Repeat("─", maxFwVerWidth),
 		strings.Repeat("─", maxBoardIdWidth),
 		strings.Repeat("─", maxStatusWidth))
-	bottomBorder := fmt.Sprintf("└─%s─┴─%s─┴─%s─┴─%s─┴─%s─┴─%s─┴─%s─┴─%s─┘\n",
+	bottomBorder := fmt.Sprintf("└─%s─┴─%s─┴─%s─┴─%s─┴─%s─┴─%s─┴─%s─┴─%s─┴─%s─┘\n",
+		strings.Repeat("─", maxSerialNumberWidth),
 		strings.Repeat("─", maxHostnameWidth),
 		strings.Repeat("─", maxHCAWidth),
 		strings.Repeat("─", maxPhysStateWidth),
@@ -446,8 +484,9 @@ func displayPrecheckResults(results []PrecheckResult) {
 
 	// 打印表格
 	fmt.Print(topBorder)
-	fmt.Printf(headerFormat, "Hostname", "HCA", "Physical State", "Logical State", "Speed", "FW Version", "Board ID", "Status")
+	fmt.Printf(headerFormat, "Serial Number", "Hostname", "HCA", "Physical State", "Logical State", "Speed", "FW Version", "Board ID", "Status")
 	fmt.Printf(separatorFormat,
+		strings.Repeat("─", maxSerialNumberWidth),
 		strings.Repeat("─", maxHostnameWidth),
 		strings.Repeat("─", maxHCAWidth),
 		strings.Repeat("─", maxPhysStateWidth),
@@ -466,6 +505,12 @@ func displayPrecheckResults(results []PrecheckResult) {
 		fwVer := result.FwVer
 		boardId := result.BoardId
 
+		// 处理 Serial Number
+		serialNumber := result.SerialNumber
+		if serialNumber == "" {
+			serialNumber = "N/A"
+		}
+
 		// 根据状态着色
 		var coloredStatus string
 		if result.Error != "" {
@@ -475,6 +520,7 @@ func displayPrecheckResults(results []PrecheckResult) {
 			speed = "N/A"
 			fwVer = "N/A"
 			boardId = "N/A"
+			serialNumber = "N/A"
 			coloredStatus = ColorYellow + "[!] ERROR    " + ColorReset
 		} else if result.IsHealthy {
 			coloredStatus = ColorGreen + "[+] HEALTHY  " + ColorReset
@@ -531,6 +577,7 @@ func displayPrecheckResults(results []PrecheckResult) {
 			// 在不同hostname之间添加分隔线（除了第一行）
 			if i > 0 {
 				fmt.Printf(separatorFormat,
+					strings.Repeat("─", maxSerialNumberWidth),
 					strings.Repeat("─", maxHostnameWidth),
 					strings.Repeat("─", maxHCAWidth),
 					strings.Repeat("─", maxPhysStateWidth),
@@ -544,7 +591,8 @@ func displayPrecheckResults(results []PrecheckResult) {
 		}
 
 		// 使用固定格式，不依赖颜色代码的长度
-		fmt.Printf("│ %-*s │ %-*s │ %-*s │ %-*s │ %s │ %s │ %s │ %s │\n",
+		fmt.Printf("│ %-*s │ %-*s │ %-*s │ %-*s │ %-*s │ %s │ %s │ %s │ %s │\n",
+			maxSerialNumberWidth, serialNumber,
 			maxHostnameWidth, displayHostname,
 			maxHCAWidth, result.HCA,
 			maxPhysStateWidth, physState,
@@ -574,4 +622,101 @@ func displayPrecheckResults(results []PrecheckResult) {
 
 	fmt.Printf("Summary: %d healthy, %d unhealthy, %d errors (Total: %d HCAs)\n",
 		healthy, unhealthy, errors, len(results))
+}
+
+// PrecheckSummary API 返回的 precheck 汇总信息
+type PrecheckSummary struct {
+	TotalHCAs      int              `json:"total_hcas"`
+	HealthyCount   int              `json:"healthy_count"`
+	UnhealthyCount int              `json:"unhealthy_count"`
+	ErrorCount     int              `json:"error_count"`
+	AllHealthy     bool             `json:"all_healthy"`
+	AllSpeedsSame  bool             `json:"all_speeds_same"`
+	CheckPassed    bool             `json:"check_passed"`
+	Results        []PrecheckResult `json:"results"`
+	SpeedStats     map[string]int   `json:"speed_stats"`    // 速度统计
+	FwVerStats     map[string]int   `json:"fw_ver_stats"`   // 固件版本统计
+	BoardIdStats   map[string]int   `json:"board_id_stats"` // 板卡ID统计
+}
+
+// ExecPrecheck 执行 precheck 并返回结构化数据（用于 API）
+func ExecPrecheck(cfg *config.Config) (*PrecheckSummary, error) {
+	// 收集所有需要检查的主机和HCA
+	var checkItems []struct {
+		hostname string
+		hca      string
+	}
+
+	// 添加服务器端的HCA
+	for _, hostname := range cfg.Server.Hostname {
+		for _, hca := range cfg.Server.Hca {
+			checkItems = append(checkItems, struct {
+				hostname string
+				hca      string
+			}{hostname, hca})
+		}
+	}
+
+	// 添加客户端的HCA
+	for _, hostname := range cfg.Client.Hostname {
+		for _, hca := range cfg.Client.Hca {
+			checkItems = append(checkItems, struct {
+				hostname string
+				hca      string
+			}{hostname, hca})
+		}
+	}
+
+	if len(checkItems) == 0 {
+		return nil, fmt.Errorf("no HCAs configured in config file")
+	}
+
+	// 并发执行检查
+	results := precheckAllHCAs(checkItems, cfg.SSH.PrivateKey)
+
+	// 统计信息
+	summary := &PrecheckSummary{
+		TotalHCAs:    len(results),
+		Results:      results,
+		SpeedStats:   make(map[string]int),
+		FwVerStats:   make(map[string]int),
+		BoardIdStats: make(map[string]int),
+	}
+
+	// 统计各项数据
+	for _, result := range results {
+		if result.Error != "" {
+			summary.ErrorCount++
+		} else if result.IsHealthy {
+			summary.HealthyCount++
+		} else {
+			summary.UnhealthyCount++
+		}
+
+		// 统计 speed
+		if result.Speed != "" {
+			summary.SpeedStats[result.Speed]++
+		}
+
+		// 统计 fw_ver
+		if result.FwVer != "" {
+			summary.FwVerStats[result.FwVer]++
+		}
+
+		// 统计 board_id
+		if result.BoardId != "" {
+			summary.BoardIdStats[result.BoardId]++
+		}
+	}
+
+	// 检查是否所有HCA都健康
+	summary.AllHealthy = (summary.HealthyCount == summary.TotalHCAs)
+
+	// 检查所有 speed 是否相同
+	summary.AllSpeedsSame = (len(summary.SpeedStats) <= 1)
+
+	// 总体检查结果
+	summary.CheckPassed = summary.AllHealthy && summary.AllSpeedsSame
+
+	return summary, nil
 }

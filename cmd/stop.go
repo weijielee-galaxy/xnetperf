@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"xnetperf/config"
@@ -39,7 +38,7 @@ func handleStopCommand(cfg *config.Config) {
 			defer wg.Done()
 
 			fmt.Printf("-> Contacting %s...\n", h)
-			cmd := exec.Command("ssh", h, commandToStop)
+			cmd := buildSSHCommand(h, commandToStop, cfg.SSH.PrivateKey)
 			output, err := cmd.CombinedOutput()
 
 			if err != nil {

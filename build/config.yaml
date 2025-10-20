@@ -1,24 +1,28 @@
 start_port: 20000
-stream_type: "p2p" # "fullmesh" or "incast" or "p2p"
-qp_num : 10
+stream_type: "incast" # "fullmesh" or "incast" or "p2p", "localtest"
+qp_num: 10
 message_size_bytes: 4096
 output_base: "./generated_scripts"
-waiting_time_seconds: 15 # Time to wait before starting client scripts
+waiting_time_seconds: 5 # Time to wait before starting client scripts
 speed: 400 # in Gbps, used for theoretical bandwidth calculation
-rdma_cm: true
+rdma_cm: false
+gid_index: 3 # GID index for RoCE v2, default is 3
+network_interface : "bond0" # Network interface name for IP detection, default is "bond0"
 
 report:
   enable: true
   dir: "/root"
 
 run:
-  infinitely: true
-  duration_seconds: 10
+  infinitely: false
+  duration_seconds: 20
+
+ssh:
+  private_key: ""
 
 server:
   hostname:
   - "cetus-g88-094"
-  - "cetus-g88-065"
   hca:
   - "mlx5_0"
   - "mlx5_1"
