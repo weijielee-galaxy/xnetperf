@@ -222,8 +222,8 @@ func (b *IBWriteBWCommandBuilder) String() string {
 	// Add report parameters if report is enabled and not running infinitely
 	if b.report && !b.runInfinitely {
 		if b.latencyTest {
-			// For latency tests, only use --output-format json and --out_json_file
-			cmd.WriteString(" --output-format json")
+			// For latency tests, use --out_json and --out_json_file (same as bandwidth)
+			cmd.WriteString(" --out_json")
 			if b.outputFileName != "" {
 				cmd.WriteString(fmt.Sprintf(" --out_json_file %s", b.outputFileName))
 			}

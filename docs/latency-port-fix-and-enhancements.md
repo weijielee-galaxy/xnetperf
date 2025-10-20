@@ -2,10 +2,107 @@
 
 ## 概述
 
-本文档记录了延迟测试（latency testing）的三个重要改进：
+本文档记录了延迟测试（latency testing）的重要改进：
 1. 修复端口冲突问题
 2. 添加 `stoplat` 子命令
 3. 在 `lat` 命令中集成 precheck 步骤
+4. **修正 JSON 输出参数**（重要修复）
+
+## 0. JSON 输出参数修正
+
+### 问题描述
+
+在最初的实现中，错误地使用了 `--output-format json` 参数用于 `ib_write_lat`，但这个参数并不存在。
+
+**错误的命令：**
+```bash
+# ❌ 错误：--output-format json 不是有效参数
+ib_write_lat -d mlx5_0 -D 5 -p 20000 --output-format json --out_json_file latency.json
+```
+
+### 正确的参数
+
+`ib_write_lat` 和 `ib_write_bw` 使用相同的 JSON 输出参数：`--out_json` 和 `--out_json_file`
+
+**正确的命令：**
+```bash
+# ✅ 正确：使用 --out_json
+# Server
+ib_write_lat -d mlx5_0 -D 5 -p 20000 --out_json --out_json_file latency_s.json
+
+# Client
+ib_write_lat -d mlx5_0 -D 5 -p 20000 192.168.1.100 --out_json --out_json_file latency_c.json
+```
+
+### 参数对比
+
+| 测试类型 | 工具 | JSON 参数 | 额外参数 |
+|---------|------|----------|---------|
+| 带宽测试 | `ib_write_bw` | `--out_json --out_json_file` | `--report_gbits` |
+| 延迟测试 | `ib_write_lat` | `--out_json --out_json_file` | 无 |
+
+**关键区别：**
+- 带宽测试：需要 `--report_gbits` 来输出 Gbits/s
+- 延迟测试：**不需要** `--report_gbits`（因为测量的是延迟而非带宽）
+- 两者都使用 `--out_json --out_json_file` 来生成 JSON 报告
+
+### 代码修复
+
+**修改前（错误）：**
+```go
+if b.latencyTest {
+    // ❌ 错误的参数
+    cmd.WriteString(" --output-format json")
+    if b.outputFileName != "" {
+        cmd.WriteString(fmt.Sprintf(" --out_json_file %s", b.outputFileName))
+    }
+}
+```
+
+**修改后（正确）：**
+```go
+if b.latencyTest {
+    // ✅ 正确：使用 --out_json（和 bandwidth 一样）
+    cmd.WriteString(" --out_json")
+    if b.outputFileName != "" {
+        cmd.WriteString(fmt.Sprintf(" --out_json_file %s", b.outputFileName))
+    }
+}
+```
+
+### 测试验证
+
+更新了测试用例以验证正确的参数：
+
+```go
+func TestLatencyTestWithReport(t *testing.T) {
+    // ...
+    
+    // ✅ 应该包含 --out_json
+    if !strings.Contains(cmd, "--out_json") {
+        t.Error("Latency command should contain '--out_json'")
+    }
+    
+    // ✅ 不应该包含 --report_gbits（这是带宽测试专用）
+    if strings.Contains(cmd, "--report_gbits") {
+        t.Error("Latency command should not contain '--report_gbits'")
+    }
+    
+    // ✅ 不应该包含错误的 --output-format 参数
+    if strings.Contains(cmd, "--output-format") {
+        t.Error("Latency command should not contain '--output-format'")
+    }
+}
+```
+
+所有测试通过：
+```bash
+$ go test ./stream/ -v -run "TestLatencyTest"
+PASS
+ok      xnetperf/stream 0.010s
+```
+
+---
 
 ## 1. 端口冲突问题修复
 
@@ -447,16 +544,35 @@ ok      xnetperf/cmd    0.024s
 
 | 文件 | 变更类型 | 说明 |
 |------|---------|------|
+| `stream/command_builder.go` | 修改 | **修正 JSON 参数：--output-format json → --out_json** |
+| `stream/command_builder_test.go` | 修改 | 更新测试用例验证正确的参数 |
 | `stream/stream_latency.go` | 修改 | 修复端口冲突，添加全局端口计数器 |
 | `cmd/stoplat.go` | 新增 | 创建 stoplat 子命令 |
 | `cmd/lat.go` | 修改 | 添加 precheck 步骤 |
 
+### 关键修复
+
+**最重要的修复：JSON 输出参数**
+- ❌ 错误：`--output-format json`（此参数不存在）
+- ✅ 正确：`--out_json`（与 ib_write_bw 一致）
+
 ### 测试验证
 
-✅ 所有单元测试通过
+✅ 所有单元测试通过（包括新增的参数验证测试）
 ✅ 编译成功
 ✅ 命令行帮助正确显示
 ✅ 端口分配逻辑验证通过
+✅ JSON 输出参数验证通过
+
+### 正确的命令格式
+
+```bash
+# Server 命令
+ib_write_lat -d mlx5_0 -D 5 -p 20000 --out_json --out_json_file latency_s_host1_mlx5_0_20000.json
+
+# Client 命令
+ib_write_lat -d mlx5_0 -D 5 -p 20000 192.168.1.100 --out_json --out_json_file latency_c_host2_mlx5_0_20000.json
+```
 
 ### 使用建议
 
@@ -479,6 +595,7 @@ ok      xnetperf/cmd    0.024s
    - 如果 precheck 失败，先使用 `xnetperf precheck` 详细查看问题
    - 如果测试卡住，使用 `xnetperf stoplat` 清理进程
    - 检查端口范围输出确认没有端口冲突
+   - **确认生成的脚本使用 `--out_json` 而非 `--output-format`**
 
 ### 后续改进建议
 

@@ -684,9 +684,9 @@ func TestLatencyTestWithReport(t *testing.T) {
 
 	cmd := builder.String()
 
-	// Should contain --output-format json
-	if !strings.Contains(cmd, "--output-format json") {
-		t.Error("Latency command should contain '--output-format json'")
+	// Should contain --out_json (same as bandwidth tests)
+	if !strings.Contains(cmd, "--out_json") {
+		t.Error("Latency command should contain '--out_json'")
 	}
 
 	// Should contain output file
@@ -697,6 +697,11 @@ func TestLatencyTestWithReport(t *testing.T) {
 	// Should NOT contain --report_gbits (bandwidth-specific)
 	if strings.Contains(cmd, "--report_gbits") {
 		t.Error("Latency command should not contain '--report_gbits'")
+	}
+
+	// Should NOT contain --output-format (incorrect parameter)
+	if strings.Contains(cmd, "--output-format") {
+		t.Error("Latency command should not contain '--output-format'")
 	}
 }
 
