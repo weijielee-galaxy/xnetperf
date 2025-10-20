@@ -137,12 +137,12 @@ func generateLatencyScriptForHCA(
 				Port(port).
 				ForLatencyTest(true).
 				RunInfinitely(false).
-				DurationSeconds(cfg.Run.DurationSeconds).
+				DurationSeconds(5).
 				RdmaCm(cfg.RdmaCm).
 				GidIndex(cfg.GidIndex).
 				Report(cfg.Report.Enable).
-				OutputFileName(fmt.Sprintf("%s/latency_s_%s_%s_%d.json",
-					cfg.Report.Dir, currentHost, currentHCA, port)).
+				OutputFileName(fmt.Sprintf("%s/latency_s_%s_%s_from_%s_%s_p%d.json",
+					cfg.Report.Dir, currentHost, currentHCA, targetHost, targetHCA, port)).
 				SSHPrivateKey(cfg.SSH.PrivateKey).
 				ServerCommand()
 
@@ -154,12 +154,12 @@ func generateLatencyScriptForHCA(
 				ForLatencyTest(true).
 				TargetIP(currentHostIP).
 				RunInfinitely(false).
-				DurationSeconds(cfg.Run.DurationSeconds).
+				DurationSeconds(5).
 				RdmaCm(cfg.RdmaCm).
 				GidIndex(cfg.GidIndex).
 				Report(cfg.Report.Enable).
-				OutputFileName(fmt.Sprintf("%s/latency_c_%s_%s_%d.json",
-					cfg.Report.Dir, targetHost, targetHCA, port)).
+				OutputFileName(fmt.Sprintf("%s/latency_c_%s_%s_to_%s_%s_p%d.json",
+					cfg.Report.Dir, targetHost, targetHCA, currentHost, currentHCA, port)).
 				SSHPrivateKey(cfg.SSH.PrivateKey).
 				ClientCommand()
 

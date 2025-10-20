@@ -139,13 +139,13 @@ func TestParseLatencyReport(t *testing.T) {
 		jsonContent     string
 		expectError     bool
 		expectNil       bool
-		expectedHost    string
-		expectedHCA     string
+		expectedSource  string
+		expectedTarget  string
 		expectedLatency float64
 	}{
 		{
 			name:     "Valid client report",
-			filename: "latency_c_host1_mlx5_0_20000.json",
+			filename: "latency_c_host1_mlx5_0_to_host2_mlx5_1_p20000.json",
 			jsonContent: `{
 				"results": [
 					{"t_avg": 1.23}
@@ -153,13 +153,13 @@ func TestParseLatencyReport(t *testing.T) {
 			}`,
 			expectError:     false,
 			expectNil:       false,
-			expectedHost:    "host1",
-			expectedHCA:     "mlx5",
+			expectedSource:  "host1:mlx5_0",
+			expectedTarget:  "host2:mlx5_1",
 			expectedLatency: 1.23,
 		},
 		{
 			name:     "Server report should be skipped",
-			filename: "latency_s_host1_mlx5_0_20000.json",
+			filename: "latency_s_host1_mlx5_0_from_host2_mlx5_1_p20000.json",
 			jsonContent: `{
 				"results": [
 					{"t_avg": 1.23}
@@ -169,14 +169,14 @@ func TestParseLatencyReport(t *testing.T) {
 			expectNil:   true,
 		},
 		{
-			name:        "Invalid filename format",
-			filename:    "invalid.json",
+			name:        "Invalid filename format - old format",
+			filename:    "latency_c_host1_mlx5_0_20000.json",
 			jsonContent: `{"results": [{"t_avg": 1.23}]}`,
 			expectError: true,
 		},
 		{
 			name:     "Empty results",
-			filename: "latency_c_host1_mlx5_0_20000.json",
+			filename: "latency_c_host1_mlx5_0_to_host2_mlx5_1_p20000.json",
 			jsonContent: `{
 				"results": []
 			}`,
@@ -184,7 +184,7 @@ func TestParseLatencyReport(t *testing.T) {
 		},
 		{
 			name:        "Invalid JSON",
-			filename:    "latency_c_host1_mlx5_0_20000.json",
+			filename:    "latency_c_host1_mlx5_0_to_host2_mlx5_1_p20000.json",
 			jsonContent: `invalid json content`,
 			expectError: true,
 		},
@@ -229,12 +229,18 @@ func TestParseLatencyReport(t *testing.T) {
 			}
 
 			// Verify parsed data
-			if result.SourceHost != tt.expectedHost {
-				t.Errorf("SourceHost = %v, expected %v", result.SourceHost, tt.expectedHost)
+			if tt.expectedSource != "" {
+				actualSource := result.SourceHost + ":" + result.SourceHCA
+				if actualSource != tt.expectedSource {
+					t.Errorf("Source = %v, expected %v", actualSource, tt.expectedSource)
+				}
 			}
 
-			if result.SourceHCA != tt.expectedHCA {
-				t.Errorf("SourceHCA = %v, expected %v", result.SourceHCA, tt.expectedHCA)
+			if tt.expectedTarget != "" {
+				actualTarget := result.TargetHost + ":" + result.TargetHCA
+				if actualTarget != tt.expectedTarget {
+					t.Errorf("Target = %v, expected %v", actualTarget, tt.expectedTarget)
+				}
 			}
 
 			if result.AvgLatencyUs != tt.expectedLatency {
@@ -259,19 +265,19 @@ func TestCollectLatencyReportData(t *testing.T) {
 		content  LatencyReport
 	}{
 		{
-			filename: "latency_c_host1_mlx5_0_20000.json",
+			filename: "latency_c_host1_mlx5_0_to_host2_mlx5_1_p20000.json",
 			content: LatencyReport{Results: []struct {
 				TAvg float64 `json:"t_avg"`
 			}{{TAvg: 1.5}}},
 		},
 		{
-			filename: "latency_c_host2_mlx5_1_20001.json",
+			filename: "latency_c_host2_mlx5_1_to_host1_mlx5_0_p20001.json",
 			content: LatencyReport{Results: []struct {
 				TAvg float64 `json:"t_avg"`
 			}{{TAvg: 2.3}}},
 		},
 		{
-			filename: "latency_s_host1_mlx5_0_20000.json", // Should be skipped
+			filename: "latency_s_host1_mlx5_0_from_host2_mlx5_1_p20000.json", // Should be skipped
 			content: LatencyReport{Results: []struct {
 				TAvg float64 `json:"t_avg"`
 			}{{TAvg: 1.0}}},

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"xnetperf/config"
 	"xnetperf/stream"
@@ -186,11 +188,48 @@ func executeLatencyAnalyzeStep(cfg *config.Config) bool {
 
 // execLatencyProbeCommand monitors ib_write_lat processes
 func execLatencyProbeCommand(cfg *config.Config) {
-	// Similar to probe command but monitor ib_write_lat instead of ib_write_bw
-	fmt.Println("Monitoring latency test processes...")
-	// TODO: Implement actual monitoring logic similar to probe command
-	// For now, just wait for the test duration
-	fmt.Printf("⏳ Waiting %d seconds for latency tests to complete...\n", cfg.Run.DurationSeconds+5)
+	// Get all hosts list
+	allHosts := make(map[string]bool)
+	for _, host := range cfg.Server.Hostname {
+		allHosts[host] = true
+	}
+	for _, host := range cfg.Client.Hostname {
+		allHosts[host] = true
+	}
+
+	if len(allHosts) == 0 {
+		fmt.Println("No hosts configured in config file")
+		return
+	}
+
+	fmt.Printf("Probing ib_write_lat processes on %d hosts...\n", len(allHosts))
+	fmt.Println("Mode: Continuous monitoring until all processes complete")
+	fmt.Println()
+
+	probeIntervalSec := 5
+
+	for {
+		results := probeLatencyAllHosts(allHosts, cfg.SSH.PrivateKey)
+		displayLatencyProbeResults(results)
+
+		// Check if all processes have completed
+		allCompleted := true
+		for _, result := range results {
+			if result.ProcessCount > 0 {
+				allCompleted = false
+				break
+			}
+		}
+
+		if allCompleted {
+			fmt.Println("✅ All ib_write_lat processes have completed!")
+			break
+		}
+
+		// Wait for next probe
+		fmt.Printf("Waiting %d seconds for next probe...\n\n", probeIntervalSec)
+		time.Sleep(time.Duration(probeIntervalSec) * time.Second)
+	}
 }
 
 // LatencyData represents a single latency measurement
@@ -247,22 +286,51 @@ func collectLatencyReportData(reportsDir string) ([]LatencyData, error) {
 // parseLatencyReport parses a single latency JSON report file
 func parseLatencyReport(filePath string) (*LatencyData, error) {
 	// Parse filename to extract source, target, and HCA information
-	// Format: latency_c_hostname_hca_port.json or latency_s_hostname_hca_port.json
+	// Format: latency_c_sourceHost_sourceHCA_to_targetHost_targetHCA_pPORT.json
+	// Example: latency_c_host2_mlx5_0_to_host1_mlx5_1_p20000.json
 	filename := filepath.Base(filePath)
 
-	// Remove extension and split by underscore
-	parts := strings.Split(strings.TrimSuffix(filename, ".json"), "_")
-	if len(parts) < 4 {
-		return nil, fmt.Errorf("invalid filename format: %s", filename)
-	}
+	// Remove extension
+	nameWithoutExt := strings.TrimSuffix(filename, ".json")
 
 	// Only process client reports (latency_c_*)
-	if parts[1] != "c" {
+	if !strings.HasPrefix(nameWithoutExt, "latency_c_") {
 		return nil, nil // Skip server reports
 	}
 
-	sourceHost := parts[2]
-	sourceHCA := parts[3]
+	// Remove "latency_c_" prefix
+	remaining := strings.TrimPrefix(nameWithoutExt, "latency_c_")
+
+	// Split by "_to_" to separate source and target
+	parts := strings.Split(remaining, "_to_")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid filename format (missing _to_): %s", filename)
+	}
+
+	// Parse source (format: host_hca)
+	sourceParts := strings.SplitN(parts[0], "_", 2)
+	if len(sourceParts) != 2 {
+		return nil, fmt.Errorf("invalid source format in filename: %s", filename)
+	}
+	sourceHost := sourceParts[0]
+	sourceHCA := sourceParts[1]
+
+	// Parse target (format: host_hca_pPORT)
+	// Need to find the last occurrence of _p to separate HCA from port
+	targetStr := parts[1]
+	pIndex := strings.LastIndex(targetStr, "_p")
+	if pIndex == -1 {
+		return nil, fmt.Errorf("invalid target format (missing _p prefix for port) in filename: %s", filename)
+	}
+
+	// Everything before "_p" is "host_hca"
+	hostAndHCA := targetStr[:pIndex]
+	targetParts := strings.SplitN(hostAndHCA, "_", 2)
+	if len(targetParts) != 2 {
+		return nil, fmt.Errorf("invalid target host_hca format in filename: %s", filename)
+	}
+	targetHost := targetParts[0]
+	targetHCA := targetParts[1]
 
 	// Read and parse JSON file
 	data, err := os.ReadFile(filePath)
@@ -282,13 +350,11 @@ func parseLatencyReport(filePath string) (*LatencyData, error) {
 
 	avgLatency := report.Results[0].TAvg
 
-	// TODO: Extract target host and HCA from connection information
-	// For now, we'll need to infer this from the test setup or add metadata to reports
 	latencyData := &LatencyData{
 		SourceHost:   sourceHost,
 		SourceHCA:    sourceHCA,
-		TargetHost:   "unknown", // Will be improved in future iterations
-		TargetHCA:    "unknown", // Will be improved in future iterations
+		TargetHost:   targetHost,
+		TargetHCA:    targetHCA,
 		AvgLatencyUs: avgLatency,
 	}
 
@@ -473,4 +539,146 @@ func avgFloat(values []float64) float64 {
 		sum += v
 	}
 	return sum / float64(len(values))
+}
+
+// LatencyProbeResult represents the probe result for ib_write_lat processes
+type LatencyProbeResult struct {
+	Hostname     string
+	ProcessCount int
+	Processes    []string
+	Error        string
+	Status       string
+}
+
+// probeLatencyAllHosts probes all hosts for ib_write_lat processes
+func probeLatencyAllHosts(hosts map[string]bool, sshKeyPath string) []LatencyProbeResult {
+	var results []LatencyProbeResult
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for hostname := range hosts {
+		wg.Add(1)
+		go func(host string) {
+			defer wg.Done()
+			result := probeLatencyHost(host, sshKeyPath)
+
+			mu.Lock()
+			results = append(results, result)
+			mu.Unlock()
+		}(hostname)
+	}
+
+	wg.Wait()
+	return results
+}
+
+// probeLatencyHost probes a single host for ib_write_lat processes
+func probeLatencyHost(hostname, sshKeyPath string) LatencyProbeResult {
+	result := LatencyProbeResult{
+		Hostname: hostname,
+	}
+
+	// Use SSH to execute ps command to find ib_write_lat processes
+	cmd := buildSSHCommand(hostname, "ps aux | grep ib_write_lat | grep -v grep", sshKeyPath)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		// If no processes found or SSH connection failed
+		if strings.Contains(string(output), "") && cmd.ProcessState != nil && cmd.ProcessState.ExitCode() == 1 {
+			// ps command returning 1 usually means no matching processes found
+			result.ProcessCount = 0
+			result.Status = "COMPLETED"
+		} else {
+			result.Error = fmt.Sprintf("SSH error: %v", err)
+			result.Status = "ERROR"
+		}
+		return result
+	}
+
+	// Parse output
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(lines) == 1 && lines[0] == "" {
+		result.ProcessCount = 0
+		result.Status = "COMPLETED"
+		return result
+	}
+
+	// Filter and count valid process lines
+	var processes []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" && strings.Contains(line, "ib_write_lat") {
+			processes = append(processes, line)
+		}
+	}
+
+	result.ProcessCount = len(processes)
+	result.Processes = processes
+
+	if result.ProcessCount > 0 {
+		result.Status = "RUNNING"
+	} else {
+		result.Status = "COMPLETED"
+	}
+
+	return result
+}
+
+// displayLatencyProbeResults displays the probe results for ib_write_lat processes
+func displayLatencyProbeResults(results []LatencyProbeResult) {
+	fmt.Printf("=== Latency Probe Results (%s) ===\n", time.Now().Format("15:04:05"))
+	fmt.Println("┌─────────────────────┬───────────────┬──────────────┬─────────────────┐")
+	fmt.Println("│ Hostname            │ Status        │ Process Count│ Details         │")
+	fmt.Println("├─────────────────────┼───────────────┼──────────────┼─────────────────┤")
+
+	for _, result := range results {
+		details := ""
+		statusIcon := ""
+
+		switch result.Status {
+		case "RUNNING":
+			statusIcon = "🟡 RUNNING"
+			if result.ProcessCount > 0 {
+				details = fmt.Sprintf("%d process(es)", result.ProcessCount)
+			}
+		case "COMPLETED":
+			statusIcon = "✅ COMPLETED"
+			details = "No processes"
+		case "ERROR":
+			statusIcon = "❌ ERROR"
+			details = "Connection failed"
+		}
+
+		fmt.Printf("│ %-19s │ %-12s │ %12d │ %-15s │\n",
+			result.Hostname, statusIcon, result.ProcessCount, details)
+
+		// If there's an error, display error message on next line
+		if result.Error != "" {
+			fmt.Printf("│ %-19s │ %-12s │ %12s │ %-15s │\n",
+				"", "Error:", "", result.Error)
+		}
+	}
+
+	fmt.Println("└─────────────────────┴───────────────┴──────────────┴─────────────────┘")
+
+	// Display summary
+	running := 0
+	completed := 0
+	errors := 0
+	totalProcesses := 0
+
+	for _, result := range results {
+		switch result.Status {
+		case "RUNNING":
+			running++
+			totalProcesses += result.ProcessCount
+		case "COMPLETED":
+			completed++
+		case "ERROR":
+			errors++
+		}
+	}
+
+	fmt.Printf("\nSummary: %d hosts running (%d processes), %d completed, %d errors\n",
+		running, totalProcesses, completed, errors)
 }
