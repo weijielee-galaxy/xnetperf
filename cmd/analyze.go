@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -27,11 +28,12 @@ type Report struct {
 
 // DeviceData represents aggregated data for a device
 type DeviceData struct {
-	Hostname string
-	Device   string
-	BWSum    float64
-	Count    int
-	IsClient bool
+	Hostname     string
+	Device       string
+	SerialNumber string
+	BWSum        float64
+	Count        int
+	IsClient     bool
 }
 
 var generateMD bool
@@ -123,6 +125,31 @@ func runP2PAnalyze(reportsDir string, cfg *config.Config) {
 	}
 }
 
+// getSerialNumberForHost 获取指定主机的序列号
+func getSerialNumberForHost(hostname string) string {
+	// 尝试通过SSH获取系统序列号
+	cmd := exec.Command("ssh", hostname, "cat /sys/class/dmi/id/product_serial")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "N/A"
+	}
+
+	serialNumber := strings.TrimSpace(string(output))
+	if serialNumber == "" {
+		return "N/A"
+	}
+
+	// 处理Serial Number：如果包含-则按-分割获取最后一个值
+	if strings.Contains(serialNumber, "-") {
+		parts := strings.Split(serialNumber, "-")
+		if len(parts) > 0 {
+			serialNumber = parts[len(parts)-1]
+		}
+	}
+
+	return serialNumber
+}
+
 func collectReportData(reportsDir string) (map[string]map[string]*DeviceData, map[string]map[string]*DeviceData, error) {
 	clientData := make(map[string]map[string]*DeviceData)
 	serverData := make(map[string]map[string]*DeviceData)
@@ -177,12 +204,16 @@ func collectReportData(reportsDir string) (map[string]map[string]*DeviceData, ma
 
 		// Initialize or update device data
 		if dataMap[hostname][device] == nil {
+			// Get serial number for this hostname
+			serialNumber := getSerialNumberForHost(hostname)
+
 			dataMap[hostname][device] = &DeviceData{
-				Hostname: hostname,
-				Device:   device,
-				BWSum:    0,
-				Count:    0,
-				IsClient: isClient,
+				Hostname:     hostname,
+				Device:       device,
+				SerialNumber: serialNumber,
+				BWSum:        0,
+				Count:        0,
+				IsClient:     isClient,
 			}
 		}
 
@@ -193,6 +224,32 @@ func collectReportData(reportsDir string) (map[string]map[string]*DeviceData, ma
 	})
 
 	return clientData, serverData, err
+}
+
+// calculateMaxSerialNumberLength 计算数据中最长的序列号长度
+func calculateMaxSerialNumberLength(dataMap map[string]map[string]*DeviceData) int {
+	maxLen := 13 // 最小长度为"Serial Number"的长度
+	for _, hostMap := range dataMap {
+		for _, data := range hostMap {
+			if len(data.SerialNumber) > maxLen {
+				maxLen = len(data.SerialNumber)
+			}
+		}
+	}
+	return maxLen
+}
+
+// calculateMaxP2PSerialNumberLength 计算P2P数据中最长的序列号长度
+func calculateMaxP2PSerialNumberLength(dataMap map[string]map[string]*P2PDeviceData) int {
+	maxLen := 13 // 最小长度为"Serial Number"的长度
+	for _, hostMap := range dataMap {
+		for _, data := range hostMap {
+			if len(data.SerialNumber) > maxLen {
+				maxLen = len(data.SerialNumber)
+			}
+		}
+	}
+	return maxLen
 }
 
 // calculateMaxDeviceNameLength 计算数据中最长的设备名称长度
@@ -222,31 +279,35 @@ func calculateMaxP2PDeviceNameLength(dataMap map[string]map[string]*P2PDeviceDat
 }
 
 // displayClientTableHeader 显示客户端表格头部（动态列宽）
-func displayClientTableHeader(deviceWidth int) {
+func displayClientTableHeader(serialNumberWidth, deviceWidth int) {
+	serialNumberDashes := strings.Repeat("─", serialNumberWidth)
 	deviceDashes := strings.Repeat("─", deviceWidth)
-	fmt.Printf("┌─────────────────────┬─%s─┬─────────────┬──────────────┬─────────────────┬──────────┐\n", deviceDashes)
-	fmt.Printf("│ Hostname            │ %-*s │ TX (Gbps)   │ SPEC (Gbps)  │ DELTA           │ Status   │\n", deviceWidth, "Device")
-	fmt.Printf("├─────────────────────┼─%s─┼─────────────┼──────────────┼─────────────────┼──────────┤\n", deviceDashes)
+	fmt.Printf("┌─%s─┬─────────────────────┬─%s─┬─────────────┬──────────────┬─────────────────┬──────────┐\n", serialNumberDashes, deviceDashes)
+	fmt.Printf("│ %-*s │ Hostname            │ %-*s │ TX (Gbps)   │ SPEC (Gbps)  │ DELTA           │ Status   │\n", serialNumberWidth, "Serial Number", deviceWidth, "Device")
+	fmt.Printf("├─%s─┼─────────────────────┼─%s─┼─────────────┼──────────────┼─────────────────┼──────────┤\n", serialNumberDashes, deviceDashes)
 }
 
 // displayClientTableFooter 显示客户端表格尾部（动态列宽）
-func displayClientTableFooter(deviceWidth int) {
+func displayClientTableFooter(serialNumberWidth, deviceWidth int) {
+	serialNumberDashes := strings.Repeat("─", serialNumberWidth)
 	deviceDashes := strings.Repeat("─", deviceWidth)
-	fmt.Printf("└─────────────────────┴─%s─┴─────────────┴──────────────┴─────────────────┴──────────┘\n", deviceDashes)
+	fmt.Printf("└─%s─┴─────────────────────┴─%s─┴─────────────┴──────────────┴─────────────────┴──────────┘\n", serialNumberDashes, deviceDashes)
 }
 
 // displayServerTableHeader 显示服务端表格头部（动态列宽）
-func displayServerTableHeader(deviceWidth int) {
+func displayServerTableHeader(serialNumberWidth, deviceWidth int) {
+	serialNumberDashes := strings.Repeat("─", serialNumberWidth)
 	deviceDashes := strings.Repeat("─", deviceWidth)
-	fmt.Printf("┌─────────────────────┬─%s─┬─────────────┐\n", deviceDashes)
-	fmt.Printf("│ Hostname            │ %-*s │ RX (Gbps)   │\n", deviceWidth, "Device")
-	fmt.Printf("├─────────────────────┼─%s─┼─────────────┤\n", deviceDashes)
+	fmt.Printf("┌─%s─┬─────────────────────┬─%s─┬─────────────┐\n", serialNumberDashes, deviceDashes)
+	fmt.Printf("│ %-*s │ Hostname            │ %-*s │ RX (Gbps)   │\n", serialNumberWidth, "Serial Number", deviceWidth, "Device")
+	fmt.Printf("├─%s─┼─────────────────────┼─%s─┼─────────────┤\n", serialNumberDashes, deviceDashes)
 }
 
 // displayServerTableFooter 显示服务端表格尾部（动态列宽）
-func displayServerTableFooter(deviceWidth int) {
+func displayServerTableFooter(serialNumberWidth, deviceWidth int) {
+	serialNumberDashes := strings.Repeat("─", serialNumberWidth)
 	deviceDashes := strings.Repeat("─", deviceWidth)
-	fmt.Printf("└─────────────────────┴─%s─┴─────────────┘\n", deviceDashes)
+	fmt.Printf("└─%s─┴─────────────────────┴─%s─┴─────────────┘\n", serialNumberDashes, deviceDashes)
 }
 
 func displayResults(clientData, serverData map[string]map[string]*DeviceData, specSpeed float64) {
@@ -270,12 +331,19 @@ func displayResults(clientData, serverData map[string]map[string]*DeviceData, sp
 		maxDeviceLen = 8 // 最小宽度
 	}
 
+	// 计算最大序列号长度
+	maxSerialNumberLen := calculateMaxSerialNumberLength(clientData)
+	serverMaxSerialNumberLen := calculateMaxSerialNumberLength(serverData)
+	if serverMaxSerialNumberLen > maxSerialNumberLen {
+		maxSerialNumberLen = serverMaxSerialNumberLen
+	}
+
 	// Display client data with enhanced table
 	fmt.Println("CLIENT DATA (TX)")
-	displayClientTableHeader(maxDeviceLen)
+	displayClientTableHeader(maxSerialNumberLen, maxDeviceLen)
 
-	displayEnhancedClientTable(clientData, theoreticalBWPerClient, maxDeviceLen)
-	displayClientTableFooter(maxDeviceLen)
+	displayEnhancedClientTable(clientData, theoreticalBWPerClient, maxSerialNumberLen, maxDeviceLen)
+	displayClientTableFooter(maxSerialNumberLen, maxDeviceLen)
 
 	fmt.Printf("\nTheoretical BW per client: %.2f Gbps (Total server BW: %.2f Gbps ÷ %d clients)\n",
 		theoreticalBWPerClient, totalServerBW, clientCount)
@@ -284,13 +352,13 @@ func displayResults(clientData, serverData map[string]map[string]*DeviceData, sp
 
 	// Display server data
 	fmt.Println("SERVER DATA (RX)")
-	displayServerTableHeader(maxDeviceLen)
+	displayServerTableHeader(maxSerialNumberLen, maxDeviceLen)
 
-	displayDataTable(serverData, true, maxDeviceLen)
-	displayServerTableFooter(maxDeviceLen)
+	displayDataTable(serverData, true, maxSerialNumberLen, maxDeviceLen)
+	displayServerTableFooter(maxSerialNumberLen, maxDeviceLen)
 }
 
-func displayDataTable(dataMap map[string]map[string]*DeviceData, isServer bool, deviceWidth int) {
+func displayDataTable(dataMap map[string]map[string]*DeviceData, isServer bool, serialNumberWidth, deviceWidth int) {
 	// Get sorted hostnames
 	var hostnames []string
 	for hostname := range dataMap {
@@ -320,13 +388,20 @@ func displayDataTable(dataMap map[string]map[string]*DeviceData, isServer bool, 
 				hostnameStr = hostname
 			}
 
-			fmt.Printf("│ %-19s │ %-*s │ %11.2f │\n",
-				hostnameStr, deviceWidth, device, total)
+			// Format serial number (only show for first device of each host)
+			serialNumberStr := ""
+			if j == 0 {
+				serialNumberStr = data.SerialNumber
+			}
+
+			fmt.Printf("│ %-*s │ %-19s │ %-*s │ %11.2f │\n",
+				serialNumberWidth, serialNumberStr, hostnameStr, deviceWidth, device, total)
 		}
 
 		// Add separator between different hostnames (except for the last one)
 		if i < len(hostnames)-1 && len(dataMap[hostname]) > 0 {
-			fmt.Printf("├─────────────────────┼─%s─┼─────────────┤\n", deviceDashes)
+			serialNumberDashes := strings.Repeat("─", serialNumberWidth)
+			fmt.Printf("├─%s─┼─────────────────────┼─%s─┼─────────────┤\n", serialNumberDashes, deviceDashes)
 		}
 	}
 }
@@ -421,7 +496,7 @@ func calculateClientCount(clientData map[string]map[string]*DeviceData) int {
 }
 
 // displayEnhancedClientTable 显示增强的客户端表格
-func displayEnhancedClientTable(clientData map[string]map[string]*DeviceData, theoreticalBW float64, deviceWidth int) {
+func displayEnhancedClientTable(clientData map[string]map[string]*DeviceData, theoreticalBW float64, serialNumberWidth, deviceWidth int) {
 	// Get sorted hostnames
 	var hostnames []string
 	for hostname := range clientData {
@@ -459,19 +534,22 @@ func displayEnhancedClientTable(clientData map[string]map[string]*DeviceData, th
 				status = "NOT OK"
 			}
 
-			// Format hostname (only show for first device of each host)
+			// Format serial number and hostname (only show for first device of each host)
+			serialNumberStr := ""
 			hostnameStr := ""
 			if j == 0 {
+				serialNumberStr = data.SerialNumber
 				hostnameStr = hostname
 			}
 
-			fmt.Printf("│ %-19s │ %-*s │ %11.2f │ %12.2f │ %15s │ %-8s │\n",
-				hostnameStr, deviceWidth, device, actualBW, theoreticalBW, deltaStr, status)
+			fmt.Printf("│ %-*s │ %-19s │ %-*s │ %11.2f │ %12.2f │ %15s │ %-8s │\n",
+				serialNumberWidth, serialNumberStr, hostnameStr, deviceWidth, device, actualBW, theoreticalBW, deltaStr, status)
 		}
 
 		// Add separator between different hostnames (except for the last one)
 		if i < len(hostnames)-1 && len(clientData[hostname]) > 0 {
-			fmt.Printf("├─────────────────────┼─%s─┼─────────────┼──────────────┼─────────────────┼──────────┤\n", deviceDashes)
+			serialNumberDashes := strings.Repeat("─", serialNumberWidth)
+			fmt.Printf("├─%s─┼─────────────────────┼─%s─┼─────────────┼──────────────┼─────────────────┼──────────┤\n", serialNumberDashes, deviceDashes)
 		}
 	}
 }
@@ -539,10 +617,11 @@ func generateEnhancedMarkdownClientContent(clientData map[string]map[string]*Dev
 
 // P2PDeviceData represents aggregated data for a P2P device
 type P2PDeviceData struct {
-	Hostname string
-	Device   string
-	BWSum    float64
-	Count    int
+	Hostname     string
+	Device       string
+	SerialNumber string
+	BWSum        float64
+	Count        int
 }
 
 // parseCustomFormat parses the custom format report files
@@ -656,11 +735,15 @@ func collectP2PReportData(reportsDir string) (map[string]map[string]*P2PDeviceDa
 
 		// Initialize or update device data
 		if p2pData[hostname][device] == nil {
+			// Get serial number for this hostname
+			serialNumber := getSerialNumberForHost(hostname)
+
 			p2pData[hostname][device] = &P2PDeviceData{
-				Hostname: hostname,
-				Device:   device,
-				BWSum:    0,
-				Count:    0,
+				Hostname:     hostname,
+				Device:       device,
+				SerialNumber: serialNumber,
+				BWSum:        0,
+				Count:        0,
 			}
 		}
 
@@ -677,17 +760,20 @@ func collectP2PReportData(reportsDir string) (map[string]map[string]*P2PDeviceDa
 func displayP2PResults(p2pData map[string]map[string]*P2PDeviceData) {
 	fmt.Println("=== P2P Performance Analysis ===")
 
-	// 计算最大设备名称长度
+	// 计算最大设备名称长度和序列号长度
 	maxDeviceLen := calculateMaxP2PDeviceNameLength(p2pData)
 	if maxDeviceLen < 8 {
 		maxDeviceLen = 8
 	}
 
+	maxSerialNumberLen := calculateMaxP2PSerialNumberLength(p2pData)
+
 	// 显示表格头部
+	serialNumberDashes := strings.Repeat("─", maxSerialNumberLen)
 	deviceDashes := strings.Repeat("─", maxDeviceLen)
-	fmt.Printf("┌─────────────────────┬─%s─┬─────────────┐\n", deviceDashes)
-	fmt.Printf("│ Hostname            │ %-*s │ Speed (Gbps)│\n", maxDeviceLen, "Device")
-	fmt.Printf("├─────────────────────┼─%s─┼─────────────┤\n", deviceDashes)
+	fmt.Printf("┌─%s─┬─────────────────────┬─%s─┬─────────────┐\n", serialNumberDashes, deviceDashes)
+	fmt.Printf("│ %-*s │ Hostname            │ %-*s │ Speed (Gbps)│\n", maxSerialNumberLen, "Serial Number", maxDeviceLen, "Device")
+	fmt.Printf("├─%s─┼─────────────────────┼─%s─┼─────────────┤\n", serialNumberDashes, deviceDashes)
 
 	// Get sorted hostnames
 	var hostnames []string
@@ -710,24 +796,26 @@ func displayP2PResults(p2pData map[string]map[string]*P2PDeviceData) {
 			data := devices[device]
 			avgSpeed := data.BWSum / float64(data.Count)
 
-			// Format hostname (only show for first device of each host)
+			// Format serial number and hostname (only show for first device of each host)
+			serialNumberStr := ""
 			hostnameStr := ""
 			if j == 0 {
+				serialNumberStr = data.SerialNumber
 				hostnameStr = hostname
 			}
 
-			fmt.Printf("│ %-19s │ %-*s │ %11.2f │\n",
-				hostnameStr, maxDeviceLen, device, avgSpeed)
+			fmt.Printf("│ %-*s │ %-19s │ %-*s │ %11.2f │\n",
+				maxSerialNumberLen, serialNumberStr, hostnameStr, maxDeviceLen, device, avgSpeed)
 
 			// Add separator between different hosts (except for the last host)
 			if j == len(deviceNames)-1 && i < len(hostnames)-1 {
-				fmt.Printf("├─────────────────────┼─%s─┼─────────────┤\n", deviceDashes)
+				fmt.Printf("├─%s─┼─────────────────────┼─%s─┼─────────────┤\n", serialNumberDashes, deviceDashes)
 			}
 		}
 	}
 
 	// 显示表格尾部
-	fmt.Printf("└─────────────────────┴─%s─┴─────────────┘\n", deviceDashes)
+	fmt.Printf("└─%s─┴─────────────────────┴─%s─┴─────────────┘\n", serialNumberDashes, deviceDashes)
 
 	// Calculate and display summary
 	totalPairs := 0
