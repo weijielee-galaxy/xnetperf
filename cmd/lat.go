@@ -16,6 +16,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ANSI color codes
+const (
+	colorRed   = "\033[31m"
+	colorReset = "\033[0m"
+)
+
+// latencyThreshold is the threshold in microseconds for marking latency as high (red)
+const latencyThreshold = 4.0
+
 var latCmd = &cobra.Command{
 	Use:   "lat",
 	Short: "Execute latency testing workflow with N×N matrix results",
@@ -603,9 +612,21 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 
 					if latency > 0 {
 						valueStr := fmt.Sprintf("%.2f μs", latency)
-						fmt.Printf(" %*s │", valueColWidth, valueStr)
+						if latency > latencyThreshold {
+							// Mark high latency in red
+							fmt.Printf(" %s%*s%s │", colorRed, valueColWidth, valueStr, colorReset)
+						} else {
+							fmt.Printf(" %*s │", valueColWidth, valueStr)
+						}
 					} else {
-						fmt.Printf(" %*s │", valueColWidth, "-")
+						// Check if this is self-to-self (diagonal)
+						if sourceHost == targetHost && sourceHCA == targetHCA {
+							// Self-to-self: display "-" without red color
+							fmt.Printf(" %*s │", valueColWidth, "-")
+						} else {
+							// Missing data: display red "*" to indicate test failure/unreachable
+							fmt.Printf(" %s%*s%s │", colorRed, valueColWidth, "*", colorReset)
+						}
 					}
 				}
 			}
@@ -1088,9 +1109,17 @@ func displayLatencyMatrixIncast(latencyData []LatencyData, cfg *config.Config) {
 					serverKey := fmt.Sprintf("%s:%s", serverHost, serverHCA)
 					latency := matrix[clientKey][serverKey]
 					if latency > 0 {
-						fmt.Printf(" %*.2f μs │", valueColWidth-3, latency)
+						valueStr := fmt.Sprintf("%.2f μs", latency)
+						if latency > latencyThreshold {
+							// Mark high latency in red
+							fmt.Printf(" %s%*s%s │", colorRed, valueColWidth, valueStr, colorReset)
+						} else {
+							fmt.Printf(" %*s │", valueColWidth, valueStr)
+						}
 					} else {
-						fmt.Printf(" %*s │", valueColWidth, "-")
+						// In incast mode, client and server are separate, so missing data is always a failure
+						// Display red "*" to indicate test failure/unreachable
+						fmt.Printf(" %s%*s%s │", colorRed, valueColWidth, "*", colorReset)
 					}
 				}
 			}
