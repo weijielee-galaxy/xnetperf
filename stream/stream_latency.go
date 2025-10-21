@@ -90,13 +90,13 @@ func generateLatencyScriptsIncast(cfg *config.Config) error {
 	fmt.Printf("Total latency ports needed: %d (from %d to %d)\n",
 		totalPorts, cfg.StartPort, cfg.StartPort+totalPorts-1)
 
-	// Generate scripts for each server to receive from all clients
+	// Generate scripts for each client (each client tests to all servers)
 	port := cfg.StartPort
-	for _, serverHost := range cfg.Server.Hostname {
+	for _, clientHost := range cfg.Client.Hostname {
 		var err error
-		port, err = generateLatencyScriptsForServerIncast(serverHost, cfg, port)
+		port, err = generateLatencyScriptsForClientIncast(clientHost, cfg, port)
 		if err != nil {
-			return fmt.Errorf("failed to generate incast scripts for server %s: %v", serverHost, err)
+			return fmt.Errorf("failed to generate incast scripts for client %s: %v", clientHost, err)
 		}
 	}
 
@@ -319,38 +319,42 @@ func executeScript(scriptPath string) error {
 	return nil
 }
 
-// generateLatencyScriptsForServerIncast generates scripts for a server in incast mode
-// Server receives latency tests from all clients
+// generateLatencyScriptsForClientIncast generates scripts for a client in incast mode
+// Client tests latency to all servers
 // Returns the next available port number
-func generateLatencyScriptsForServerIncast(serverHost string, cfg *config.Config, startPort int) (int, error) {
-	// Get IP address for this server
-	output, err := getHostIP(serverHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
-	if err != nil {
-		return startPort, fmt.Errorf("failed to get IP for %s: %v\nOutput: %s", serverHost, err, string(output))
+func generateLatencyScriptsForClientIncast(clientHost string, cfg *config.Config, startPort int) (int, error) {
+	// Get IP addresses for all servers
+	serverIPs := make(map[string]string)
+	for _, serverHost := range cfg.Server.Hostname {
+		output, err := getHostIP(serverHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
+		if err != nil {
+			return startPort, fmt.Errorf("failed to get IP for server %s: %v\nOutput: %s", serverHost, err, string(output))
+		}
+		serverIPs[serverHost] = strings.TrimSpace(string(output))
+		fmt.Printf("Server %s IP: %s\n", serverHost, serverIPs[serverHost])
 	}
-	serverHostIP := strings.TrimSpace(string(output))
-	fmt.Printf("Server %s IP: %s\n", serverHost, serverHostIP)
 
-	// Generate scripts for each HCA on this server
+	// Generate scripts for each HCA on this client
 	port := startPort
-	for _, serverHCA := range cfg.Server.Hca {
+	for _, clientHCA := range cfg.Client.Hca {
 		var err error
-		port, err = generateLatencyScriptForServerHCAIncast(
-			serverHost, serverHostIP, serverHCA, cfg, port,
+		port, err = generateLatencyScriptForClientHCAIncast(
+			clientHost, clientHCA, serverIPs, cfg, port,
 		)
 		if err != nil {
-			return port, fmt.Errorf("failed to generate incast scripts for HCA %s on server %s: %v",
-				serverHCA, serverHost, err)
+			return port, fmt.Errorf("failed to generate incast scripts for HCA %s on client %s: %v",
+				clientHCA, clientHost, err)
 		}
 	}
 
 	return port, nil
 }
 
-// generateLatencyScriptForServerHCAIncast generates server and client scripts for a specific server HCA in incast mode
+// generateLatencyScriptForClientHCAIncast generates server and client scripts for a specific client HCA in incast mode
 // Returns the next available port number
-func generateLatencyScriptForServerHCAIncast(
-	serverHost, serverHostIP, serverHCA string,
+func generateLatencyScriptForClientHCAIncast(
+	clientHost, clientHCA string,
+	serverIPs map[string]string,
 	cfg *config.Config,
 	startPort int,
 ) (int, error) {
@@ -359,15 +363,16 @@ func generateLatencyScriptForServerHCAIncast(
 
 	outputDir := getLatencyOutputDir(cfg)
 	serverScriptFileName := fmt.Sprintf("%s/%s_%s_server_latency.sh",
-		outputDir, serverHost, serverHCA)
+		outputDir, clientHost, clientHCA)
 	clientScriptFileName := fmt.Sprintf("%s/%s_%s_client_latency.sh",
-		outputDir, serverHost, serverHCA)
+		outputDir, clientHost, clientHCA)
 
 	port := startPort
 
-	// In incast mode: all clients test to this server HCA
-	for _, clientHost := range cfg.Client.Hostname {
-		for _, clientHCA := range cfg.Client.Hca {
+	// In incast mode: this client HCA tests to all server HCAs
+	for _, serverHost := range cfg.Server.Hostname {
+		serverIP := serverIPs[serverHost]
+		for _, serverHCA := range cfg.Server.Hca {
 			// Generate server command (runs on server host)
 			serverCmd := NewIBWriteBWCommandBuilder().
 				Host(serverHost).
@@ -390,7 +395,7 @@ func generateLatencyScriptForServerHCAIncast(
 				Device(clientHCA).
 				Port(port).
 				ForLatencyTest(true).
-				TargetIP(serverHostIP).
+				TargetIP(serverIP).
 				RunInfinitely(false).
 				DurationSeconds(5).
 				RdmaCm(cfg.RdmaCm).
@@ -419,7 +424,7 @@ func generateLatencyScriptForServerHCAIncast(
 	}
 
 	fmt.Printf("✅ Generated incast latency scripts for %s:%s (ports %d-%d)\n",
-		serverHost, serverHCA, startPort, port-1)
+		clientHost, clientHCA, startPort, port-1)
 
 	// Print first few lines of scripts for debugging
 	serverLines := strings.Split(serverScriptContent.String(), "\n")
