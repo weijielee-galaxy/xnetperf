@@ -66,7 +66,7 @@ func TestCalculateTotalLatencyPortsFormula(t *testing.T) {
 	hcas := []string{"mlx5_0", "mlx5_1", "mlx5_2", "mlx5_3"}
 
 	result := calculateTotalLatencyPorts(hosts, hcas)
-	totalHCAs := 10 * 4 // 40 total HCAs
+	totalHCAs := 10 * 4                     // 40 total HCAs
 	expected := totalHCAs * (totalHCAs - 1) // 40 * 39 = 1560 ports
 
 	if result != expected {
@@ -321,14 +321,14 @@ func TestGenerateLatencyScriptForHCA_FilenameFormat(t *testing.T) {
 
 	// Verify filename format in server script
 	serverStr := string(serverContent)
-	
+
 	// First connection: same host, different HCA (node-a:mlx5_1 -> node-a:mlx5_0)
 	expectedServerFilename1 := "latency_s_node-a_mlx5_0_from_node-a_mlx5_1_p25000.json"
 	if !strings.Contains(serverStr, expectedServerFilename1) {
 		t.Errorf("Server script missing expected filename: %s", expectedServerFilename1)
 		t.Logf("Server script content:\n%s", serverStr)
 	}
-	
+
 	// Second connection: different host (node-b:mlx5_1 -> node-a:mlx5_0)
 	expectedServerFilename2 := "latency_s_node-a_mlx5_0_from_node-b_mlx5_1_p25001.json"
 	if !strings.Contains(serverStr, expectedServerFilename2) {
@@ -338,14 +338,14 @@ func TestGenerateLatencyScriptForHCA_FilenameFormat(t *testing.T) {
 
 	// Verify filename format in client script
 	clientStr := string(clientContent)
-	
+
 	// First connection: same host (node-a:mlx5_1 -> node-a:mlx5_0)
 	expectedClientFilename1 := "latency_c_node-a_mlx5_1_to_node-a_mlx5_0_p25000.json"
 	if !strings.Contains(clientStr, expectedClientFilename1) {
 		t.Errorf("Client script missing expected filename: %s", expectedClientFilename1)
 		t.Logf("Client script content:\n%s", clientStr)
 	}
-	
+
 	// Second connection: different host (node-b:mlx5_1 -> node-a:mlx5_0)
 	expectedClientFilename2 := "latency_c_node-b_mlx5_1_to_node-a_mlx5_0_p25001.json"
 	if !strings.Contains(clientStr, expectedClientFilename2) {
