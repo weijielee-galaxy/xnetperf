@@ -255,7 +255,19 @@ func generateLatencyScriptForHCA(
 func RunLatencyScripts(cfg *config.Config) error {
 	outputDir := getLatencyOutputDir(cfg)
 	fmt.Println("🚀 Starting latency test execution...")
-	fmt.Println("Phase 1: Starting all server processes...")
+
+	// Dispatch based on stream type
+	if cfg.StreamType == config.InCast {
+		return runLatencyScriptsIncast(cfg, outputDir)
+	}
+
+	// Default to fullmesh mode
+	return runLatencyScriptsFullmesh(cfg, outputDir)
+}
+
+// runLatencyScriptsFullmesh executes fullmesh latency scripts
+func runLatencyScriptsFullmesh(cfg *config.Config, outputDir string) error {
+	fmt.Println("Phase 1: Starting all server processes (FULLMESH mode)...")
 
 	// Phase 1: Start all servers
 	allHosts := append(cfg.Server.Hostname, cfg.Client.Hostname...)
@@ -275,13 +287,55 @@ func RunLatencyScripts(cfg *config.Config) error {
 	fmt.Printf("\nWaiting %d seconds for servers to initialize...\n", cfg.WaitingTimeSeconds)
 	time.Sleep(time.Second * time.Duration(cfg.WaitingTimeSeconds))
 
-	fmt.Println("Phase 2: Starting all client processes...")
+	fmt.Println("Phase 2: Starting all client processes (FULLMESH mode)...")
 
 	// Phase 2: Start all clients
 	for _, host := range allHosts {
 		for _, hca := range cfg.Client.Hca {
 			clientScript := fmt.Sprintf("%s/%s_%s_client_latency.sh",
 				outputDir, host, hca)
+
+			fmt.Printf("  Executing: bash %s\n", clientScript)
+			if err := executeScript(clientScript); err != nil {
+				return fmt.Errorf("failed to execute client script %s: %v", clientScript, err)
+			}
+		}
+	}
+
+	fmt.Println("✅ All latency test scripts executed successfully")
+	return nil
+}
+
+// runLatencyScriptsIncast executes incast latency scripts
+// Only client hosts have script files in incast mode
+func runLatencyScriptsIncast(cfg *config.Config, outputDir string) error {
+	fmt.Println("Phase 1: Starting all server processes (INCAST mode)...")
+
+	// Phase 1: Start all servers
+	// In incast mode, only client hosts have script files
+	for _, clientHost := range cfg.Client.Hostname {
+		for _, clientHCA := range cfg.Client.Hca {
+			serverScript := fmt.Sprintf("%s/%s_%s_server_latency.sh",
+				outputDir, clientHost, clientHCA)
+
+			fmt.Printf("  Executing: bash %s\n", serverScript)
+			if err := executeScript(serverScript); err != nil {
+				return fmt.Errorf("failed to execute server script %s: %v", serverScript, err)
+			}
+		}
+	}
+
+	// Wait for servers to initialize
+	fmt.Printf("\nWaiting %d seconds for servers to initialize...\n", cfg.WaitingTimeSeconds)
+	time.Sleep(time.Second * time.Duration(cfg.WaitingTimeSeconds))
+
+	fmt.Println("Phase 2: Starting all client processes (INCAST mode)...")
+
+	// Phase 2: Start all clients
+	for _, clientHost := range cfg.Client.Hostname {
+		for _, clientHCA := range cfg.Client.Hca {
+			clientScript := fmt.Sprintf("%s/%s_%s_client_latency.sh",
+				outputDir, clientHost, clientHCA)
 
 			fmt.Printf("  Executing: bash %s\n", clientScript)
 			if err := executeScript(clientScript); err != nil {
