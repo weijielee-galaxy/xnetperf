@@ -1,11 +1,12 @@
 package stream
 
 import (
+	"fmt"
 	"testing"
 	"xnetperf/config"
 )
 
-func TestGenerateIncastScriptsV2(t *testing.T) {
+func TestGenerateIncastScriptsV1(t *testing.T) {
 	cfg := &config.Config{
 		Server: config.ServerConfig{
 			Hostname: []string{"server1", "server2"},
@@ -29,5 +30,12 @@ func TestGenerateIncastScriptsV2(t *testing.T) {
 		},
 		OutputBase: "./test_scripts",
 	}
-	GenerateIncastScriptsV2(cfg)
+	ret := GenerateIncastScriptsV1(cfg)
+
+	for _, sScript := range ret.ServerScripts {
+		fmt.Printf("Server Host: %s\nScript:\n%s\n", sScript.Host, sScript.Command)
+	}
+	for _, cScript := range ret.ClientScripts {
+		fmt.Printf("Client Host: %s\nScript:\n%s\n", cScript.Host, cScript.Command)
+	}
 }

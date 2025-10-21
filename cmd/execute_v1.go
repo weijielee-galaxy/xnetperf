@@ -10,44 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var executeCmd = &cobra.Command{
-	Use:   "execute",
-	Short: "Execute complete test workflow: run -> probe -> collect -> analyze",
-	Long: `Execute the complete network performance testing workflow:
-
-1. Run network tests (equivalent to 'xnetperf run')
-2. Monitor test progress with 5-second intervals (equivalent to 'xnetperf probe')
-3. Collect report files and cleanup remote files (equivalent to 'xnetperf collect --cleanup')
-4. Analyze results and display performance tables (equivalent to 'xnetperf analyze')
-
-This command automates the entire testing process from start to finish.
-
-Examples:
-  # Execute complete workflow with default config
-  xnetperf execute
-
-  # Execute with custom config file
-  xnetperf execute -c /path/to/config.yaml`,
-	Run: doRunExecute,
-}
-
-func doRunExecute(cmd *cobra.Command, args []string) {
-	cfg, err := config.LoadConfig(cfgFile)
-	if err != nil {
-		fmt.Printf("❌ Error loading config: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println(cfgFile)
-	fmt.Println(cfg.Version, cfg.Version == "v1")
-
-	if cfg.Version == "v1" {
-		runExecuteV1(cmd, args)
-	} else {
-		runExecute(cmd, args)
-	}
-}
-
-func runExecute(cmd *cobra.Command, args []string) {
+func runExecuteV1(cmd *cobra.Command, args []string) {
 	fmt.Println("🚀 Starting complete xnetperf workflow...")
 	fmt.Println(strings.Repeat("=", 60))
 
@@ -60,7 +23,7 @@ func runExecute(cmd *cobra.Command, args []string) {
 
 	// Step 1: Execute run command
 	fmt.Println("\n📋 Step 1/4: Running network tests...")
-	if !executeRunStep(cfg) {
+	if !executeRunStepV1(cfg) {
 		fmt.Println("❌ Run step failed. Aborting workflow.")
 		os.Exit(1)
 	}
@@ -98,17 +61,17 @@ func runExecute(cmd *cobra.Command, args []string) {
 }
 
 // executeRunStep runs the network tests
-func executeRunStep(cfg *config.Config) bool {
+func executeRunStepV1(cfg *config.Config) bool {
 	fmt.Printf("Executing network tests (stream_type: %s)...\n", cfg.StreamType)
 
-	execRunCommand(cfg)
+	execRunCommandV1(cfg)
 
 	fmt.Println("✅ Network tests started successfully")
 	return true
 }
 
 // executeProbeStep monitors the test progress using probe logic
-func executeProbeStep(cfg *config.Config) bool {
+func executeProbeStepV1(cfg *config.Config) bool {
 	fmt.Println("Monitoring ib_write_bw processes (5-second intervals)...")
 
 	execProbeCommand(cfg)
@@ -116,7 +79,7 @@ func executeProbeStep(cfg *config.Config) bool {
 }
 
 // executeCollectStep collects report files with cleanup
-func executeCollectStep(cfg *config.Config) bool {
+func executeCollectStepV1(cfg *config.Config) bool {
 	if !cfg.Report.Enable {
 		fmt.Println("⚠️  Report generation is disabled in config. Skipping collect step.")
 		return true
@@ -136,7 +99,7 @@ func executeCollectStep(cfg *config.Config) bool {
 }
 
 // executeAnalyzeStep analyzes the results
-func executeAnalyzeStep(cfg *config.Config) bool {
+func executeAnalyzeStepV1(cfg *config.Config) bool {
 	if !cfg.Report.Enable {
 		fmt.Println("⚠️  Report generation is disabled in config. Skipping analyze step.")
 		return true

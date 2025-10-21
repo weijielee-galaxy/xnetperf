@@ -323,3 +323,72 @@ func GenerateScripts(cfg *config.Config) error {
 		return fmt.Errorf("invalid stream_type '%s' in config", cfg.StreamType)
 	}
 }
+
+func GenerateScriptsV1(cfg *config.Config) (*ScriptResult, error) {
+	fmt.Println("Generating scripts based on stream type:", cfg.StreamType)
+	switch cfg.StreamType {
+	case config.FullMesh:
+		panic("un impl")
+	case config.InCast:
+		return GenerateIncastScriptsV1(cfg), nil
+	case config.P2P:
+		panic("un impl")
+	case config.LocalTest:
+		panic("un impl")
+	default:
+		return nil, fmt.Errorf("invalid stream_type '%s' in config", cfg.StreamType)
+	}
+}
+
+func DistributeAndRunScriptsV1(scripts *ScriptResult, cfg *config.Config) {
+	// 下发前先清空之前的结果
+	fmt.Println("Distributing and running scripts...")
+	allServerHostName := append(cfg.Server.Hostname, cfg.Client.Hostname...)
+	fmt.Println(allServerHostName)
+	ClearPreviewScript(allServerHostName, cfg.SSH.PrivateKey)
+
+	swg := &sync.WaitGroup{}
+	for _, sScript := range scripts.ServerScripts {
+		swg.Add(1)
+		go func(script *HostScript) {
+			defer swg.Done()
+			fmt.Println("Running the following scripts on host: ", script.Host)
+			fmt.Println(script.Command)
+
+			sshCmd := "ssh " + script.Host + " '" + script.Command + "'"
+			fmt.Println()
+			err := executeRemoteScript(script.Host, []byte(sshCmd))
+			if err != nil {
+				fmt.Printf("  -> ❌ Execution failed on server %s: %v\n", script.Host, err)
+			} else {
+				fmt.Printf("  -> ✅ Execution successful on server %s.\n", script.Host)
+				time.Sleep(2000 * time.Millisecond)
+			}
+		}(sScript)
+	}
+	swg.Wait()
+
+	fmt.Printf("\nWaiting %d seconds before starting client scripts...\n", cfg.WaitingTimeSeconds)
+	time.Sleep(time.Second * time.Duration(cfg.WaitingTimeSeconds))
+
+	cwg := &sync.WaitGroup{}
+	for _, cScript := range scripts.ClientScripts {
+		cwg.Add(1)
+		go func(script *HostScript) {
+			defer cwg.Done()
+			fmt.Println("Running the following scripts on host: ", script.Host)
+			fmt.Println(script.Command)
+
+			sshCmd := "ssh " + script.Host + " '" + script.Command + "'"
+			fmt.Println()
+			err := executeRemoteScript(script.Host, []byte(sshCmd))
+			if err != nil {
+				fmt.Printf("  -> ❌ Execution failed on client %s: %v\n", script.Host, err)
+			} else {
+				fmt.Printf("  -> ✅ Execution successful on client %s.\n", script.Host)
+				time.Sleep(2000 * time.Millisecond)
+			}
+		}(cScript)
+	}
+	cwg.Wait()
+}

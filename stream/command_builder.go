@@ -262,5 +262,5 @@ func (b *IBWriteBWCommandBuilder) ServerCommand() *IBWriteBWCommandBuilder {
 
 // ClientCommand creates a client command with target IP
 func (b *IBWriteBWCommandBuilder) ClientCommand() *IBWriteBWCommandBuilder {
-	return b.SleepTime("0.06") // Client commands typically have longer sleep
+	return b // Client commands typically have longer sleep
 }

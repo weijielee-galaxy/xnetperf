@@ -103,16 +103,15 @@ ClientB
   - mlx5_0
   - mlx5_1
 */
-func GenerateIncastScriptsV2(cfg *config.Config) {
-	// 运行在每个server的每个HCA上监听的脚本
+func GenerateIncastScriptsV1(cfg *config.Config) *ScriptResult {
+	sCmdMap := make(map[string][]string) // map: serverHost -> []commands
+	cCmdMap := make(map[string][]string) // map: clientHost -> []commands
 	for _, sHost := range cfg.Server.Hostname {
-		fmt.Println(sHost)
 		port := 20000
 		for _, sHca := range cfg.Server.Hca {
-			fmt.Println("\t", sHca)
 			for _, cHost := range cfg.Client.Hostname {
 				for _, cHca := range cfg.Client.Hca {
-					serverCmd := NewIBWriteBWCommandBuilder(true).
+					serverCmd := NewIBWriteBWCommandBuilder(false).
 						Host(sHost).
 						Device(sHca).
 						QueuePairNum(cfg.QpNum).
@@ -125,14 +124,75 @@ func GenerateIncastScriptsV2(cfg *config.Config) {
 						Report(cfg.Report.Enable).
 						OutputFileName(fmt.Sprintf("%s/report_s_%s_%s_%d.json", cfg.Report.Dir, sHost, sHca, port)).
 						SSHPrivateKey(cfg.SSH.PrivateKey).
+						SleepTime("").
 						ServerCommand() // 服务器命令不需要目标IP
-					fmt.Println("\t\t", serverCmd.String())
+					sCmdMap[sHost] = append(sCmdMap[sHost], serverCmd.String())
 
-					_, _ = cHost, cHca // avoid unused variable error
+					clientCmd := NewIBWriteBWCommandBuilder(false).
+						Host(cHost).
+						Device(cHca).
+						QueuePairNum(cfg.QpNum).
+						MessageSize(cfg.MessageSizeBytes).
+						Port(port).
+						// TargetIP(strings.TrimSpace(string(hostIP))). // TODO
+						TargetIP(sHost).
+						RunInfinitely(cfg.Run.Infinitely).
+						DurationSeconds(cfg.Run.DurationSeconds).
+						RdmaCm(cfg.RdmaCm).
+						GidIndex(cfg.GidIndex).
+						Report(cfg.Report.Enable).
+						OutputFileName(fmt.Sprintf("%s/report_c_%s_%s_%d.json", cfg.Report.Dir, cHost, cHca, port)).
+						SSHPrivateKey(cfg.SSH.PrivateKey).
+						SleepTime("").
+						ClientCommand()
+					cCmdMap[cHost] = append(cCmdMap[cHost], clientCmd.String())
 
 					port++
 				}
 			}
 		}
 	}
+
+	sScripts := make([]*HostScript, 0)
+	for host, cmds := range sCmdMap {
+		sCmds := []string{}
+		for _, cmd := range cmds {
+			// fmt.Println("\t", cmd)
+			sCmds = append(sCmds, "( "+cmd+" )")
+		}
+
+		sScripts = append(sScripts, &HostScript{
+			Host:    host,
+			Command: strings.Join(sCmds, delimiter),
+		})
+	}
+
+	cScripts := make([]*HostScript, 0)
+	for host, cmds := range cCmdMap {
+		cCmds := []string{}
+		for _, cmd := range cmds {
+			cCmds = append(cCmds, "( "+cmd+" )")
+		}
+		cScripts = append(cScripts, &HostScript{
+			Host:    host,
+			Command: strings.Join(cCmds, delimiter),
+		})
+	}
+
+	return &ScriptResult{
+		ServerScripts: sScripts,
+		ClientScripts: cScripts,
+	}
+}
+
+const delimiter = " && \\ \n"
+
+type ScriptResult struct {
+	ServerScripts []*HostScript
+	ClientScripts []*HostScript
+}
+
+type HostScript struct {
+	Host    string
+	Command string
 }
