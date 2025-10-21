@@ -34,20 +34,29 @@ func clearLatencyScriptDir(cfg *config.Config) {
 	fmt.Printf("Cleared latency script directory: %s\n", dir)
 }
 
-// GenerateLatencyScripts generates N×N latency test scripts for full-mesh topology
-// Each HCA on each host will test latency to every other HCA on every other host
+// GenerateLatencyScripts generates latency test scripts based on stream_type
+// Supports fullmesh (N×N) and incast (client→server only) modes
 func GenerateLatencyScripts(cfg *config.Config) error {
-	// Always show what stream_type is configured, but continue anyway
-	if cfg.StreamType != "fullmesh" {
-		fmt.Printf("⚠️  Note: Config stream_type is '%s', but latency testing uses full-mesh topology\n", cfg.StreamType)
-	}
-
 	// Clear latency script directory
 	clearLatencyScriptDir(cfg)
 
+	// Generate scripts based on stream type
+	if cfg.StreamType == config.InCast {
+		return generateLatencyScriptsIncast(cfg)
+	}
+
+	// Default to fullmesh mode
+	return generateLatencyScriptsFullmesh(cfg)
+}
+
+// generateLatencyScriptsFullmesh generates N×N latency test scripts for full-mesh topology
+// Each HCA on each host will test latency to every other HCA on every other host
+func generateLatencyScriptsFullmesh(cfg *config.Config) error {
+	fmt.Printf("📊 Generating latency scripts in FULLMESH mode\n")
+
 	// Calculate total ports needed for N×N testing
 	allHosts := append(cfg.Server.Hostname, cfg.Client.Hostname...)
-	totalPorts := calculateTotalLatencyPorts(allHosts, cfg.Client.Hca)
+	totalPorts := calculateTotalLatencyPortsFullmesh(allHosts, cfg.Client.Hca)
 
 	fmt.Printf("Total latency ports needed: %d (from %d to %d)\n",
 		totalPorts, cfg.StartPort, cfg.StartPort+totalPorts-1)
@@ -56,21 +65,50 @@ func GenerateLatencyScripts(cfg *config.Config) error {
 	port := cfg.StartPort
 	for _, currentHost := range allHosts {
 		var err error
-		port, err = generateLatencyScriptsForHost(currentHost, allHosts, cfg, port)
+		port, err = generateLatencyScriptsForHostFullmesh(currentHost, allHosts, cfg, port)
 		if err != nil {
 			return fmt.Errorf("failed to generate scripts for %s: %v", currentHost, err)
 		}
 	}
 
 	outputDir := getLatencyOutputDir(cfg)
-	fmt.Printf("✅ Successfully generated latency test scripts in %s\n", outputDir)
+	fmt.Printf("✅ Successfully generated fullmesh latency test scripts in %s\n", outputDir)
 	return nil
 }
 
-// calculateTotalLatencyPorts calculates the total number of ports needed
+// generateLatencyScriptsIncast generates client→server latency test scripts for incast topology
+// Only clients test latency to servers, not vice versa
+func generateLatencyScriptsIncast(cfg *config.Config) error {
+	fmt.Printf("📊 Generating latency scripts in INCAST mode (client → server only)\n")
+
+	// Calculate total ports needed for incast testing
+	totalPorts := calculateTotalLatencyPortsIncast(
+		cfg.Server.Hostname, cfg.Server.Hca,
+		cfg.Client.Hostname, cfg.Client.Hca,
+	)
+
+	fmt.Printf("Total latency ports needed: %d (from %d to %d)\n",
+		totalPorts, cfg.StartPort, cfg.StartPort+totalPorts-1)
+
+	// Generate scripts for each server to receive from all clients
+	port := cfg.StartPort
+	for _, serverHost := range cfg.Server.Hostname {
+		var err error
+		port, err = generateLatencyScriptsForServerIncast(serverHost, cfg, port)
+		if err != nil {
+			return fmt.Errorf("failed to generate incast scripts for server %s: %v", serverHost, err)
+		}
+	}
+
+	outputDir := getLatencyOutputDir(cfg)
+	fmt.Printf("✅ Successfully generated incast latency test scripts in %s\n", outputDir)
+	return nil
+}
+
+// calculateTotalLatencyPortsFullmesh calculates the total number of ports needed for fullmesh mode
 // For N hosts with H HCAs each, we need N × H × (N × H - 1) ports
 // (each HCA tests to all other HCAs except itself)
-func calculateTotalLatencyPorts(hosts []string, hcas []string) int {
+func calculateTotalLatencyPortsFullmesh(hosts []string, hcas []string) int {
 	numHosts := len(hosts)
 	numHcas := len(hcas)
 	totalHCAs := numHosts * numHcas
@@ -79,9 +117,21 @@ func calculateTotalLatencyPorts(hosts []string, hcas []string) int {
 	return totalHCAs * (totalHCAs - 1)
 }
 
-// generateLatencyScriptsForHost generates server and client scripts for a specific host
+// calculateTotalLatencyPortsIncast calculates the total number of ports needed for incast mode
+// Only clients test to servers: num_clients × num_client_hcas × num_servers × num_server_hcas
+func calculateTotalLatencyPortsIncast(serverHosts []string, serverHcas []string, clientHosts []string, clientHcas []string) int {
+	numServers := len(serverHosts)
+	numServerHcas := len(serverHcas)
+	numClients := len(clientHosts)
+	numClientHcas := len(clientHcas)
+
+	// Each client HCA tests to all server HCAs
+	return numServers * numServerHcas * numClients * numClientHcas
+}
+
+// generateLatencyScriptsForHostFullmesh generates server and client scripts for a specific host in fullmesh mode
 // Returns the next available port number
-func generateLatencyScriptsForHost(currentHost string, allHosts []string, cfg *config.Config, startPort int) (int, error) {
+func generateLatencyScriptsForHostFullmesh(currentHost string, allHosts []string, cfg *config.Config, startPort int) (int, error) {
 	// Get IP address for this host
 	output, err := getHostIP(currentHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
 	if err != nil {
@@ -144,7 +194,7 @@ func generateLatencyScriptForHCA(
 				RdmaCm(cfg.RdmaCm).
 				GidIndex(cfg.GidIndex).
 				Report(cfg.Report.Enable).
-				OutputFileName(fmt.Sprintf("%s/latency_s_%s_%s_from_%s_%s_p%d.json",
+				OutputFileName(fmt.Sprintf("%s/latency_fullmesh_s_%s_%s_from_%s_%s_p%d.json",
 					cfg.Report.Dir, currentHost, currentHCA, targetHost, targetHCA, port)).
 				SSHPrivateKey(cfg.SSH.PrivateKey).
 				ServerCommand()
@@ -161,7 +211,7 @@ func generateLatencyScriptForHCA(
 				RdmaCm(cfg.RdmaCm).
 				GidIndex(cfg.GidIndex).
 				Report(cfg.Report.Enable).
-				OutputFileName(fmt.Sprintf("%s/latency_c_%s_%s_to_%s_%s_p%d.json",
+				OutputFileName(fmt.Sprintf("%s/latency_fullmesh_c_%s_%s_to_%s_%s_p%d.json",
 					cfg.Report.Dir, targetHost, targetHCA, currentHost, currentHCA, port)).
 				SSHPrivateKey(cfg.SSH.PrivateKey).
 				ClientCommand()
@@ -267,4 +317,119 @@ func executeScript(scriptPath string) error {
 	}
 
 	return nil
+}
+
+// generateLatencyScriptsForServerIncast generates scripts for a server in incast mode
+// Server receives latency tests from all clients
+// Returns the next available port number
+func generateLatencyScriptsForServerIncast(serverHost string, cfg *config.Config, startPort int) (int, error) {
+	// Get IP address for this server
+	output, err := getHostIP(serverHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
+	if err != nil {
+		return startPort, fmt.Errorf("failed to get IP for %s: %v\nOutput: %s", serverHost, err, string(output))
+	}
+	serverHostIP := strings.TrimSpace(string(output))
+	fmt.Printf("Server %s IP: %s\n", serverHost, serverHostIP)
+
+	// Generate scripts for each HCA on this server
+	port := startPort
+	for _, serverHCA := range cfg.Server.Hca {
+		var err error
+		port, err = generateLatencyScriptForServerHCAIncast(
+			serverHost, serverHostIP, serverHCA, cfg, port,
+		)
+		if err != nil {
+			return port, fmt.Errorf("failed to generate incast scripts for HCA %s on server %s: %v",
+				serverHCA, serverHost, err)
+		}
+	}
+
+	return port, nil
+}
+
+// generateLatencyScriptForServerHCAIncast generates server and client scripts for a specific server HCA in incast mode
+// Returns the next available port number
+func generateLatencyScriptForServerHCAIncast(
+	serverHost, serverHostIP, serverHCA string,
+	cfg *config.Config,
+	startPort int,
+) (int, error) {
+	serverScriptContent := strings.Builder{}
+	clientScriptContent := strings.Builder{}
+
+	outputDir := getLatencyOutputDir(cfg)
+	serverScriptFileName := fmt.Sprintf("%s/%s_%s_server_latency.sh",
+		outputDir, serverHost, serverHCA)
+	clientScriptFileName := fmt.Sprintf("%s/%s_%s_client_latency.sh",
+		outputDir, serverHost, serverHCA)
+
+	port := startPort
+
+	// In incast mode: all clients test to this server HCA
+	for _, clientHost := range cfg.Client.Hostname {
+		for _, clientHCA := range cfg.Client.Hca {
+			// Generate server command (runs on server host)
+			serverCmd := NewIBWriteBWCommandBuilder().
+				Host(serverHost).
+				Device(serverHCA).
+				Port(port).
+				ForLatencyTest(true).
+				RunInfinitely(false).
+				DurationSeconds(5).
+				RdmaCm(cfg.RdmaCm).
+				GidIndex(cfg.GidIndex).
+				Report(cfg.Report.Enable).
+				OutputFileName(fmt.Sprintf("%s/latency_incast_s_%s_%s_from_%s_%s_p%d.json",
+					cfg.Report.Dir, serverHost, serverHCA, clientHost, clientHCA, port)).
+				SSHPrivateKey(cfg.SSH.PrivateKey).
+				ServerCommand()
+
+			// Generate client command (connects from client to server)
+			clientCmd := NewIBWriteBWCommandBuilder().
+				Host(clientHost).
+				Device(clientHCA).
+				Port(port).
+				ForLatencyTest(true).
+				TargetIP(serverHostIP).
+				RunInfinitely(false).
+				DurationSeconds(5).
+				RdmaCm(cfg.RdmaCm).
+				GidIndex(cfg.GidIndex).
+				Report(cfg.Report.Enable).
+				OutputFileName(fmt.Sprintf("%s/latency_incast_c_%s_%s_to_%s_%s_p%d.json",
+					cfg.Report.Dir, clientHost, clientHCA, serverHost, serverHCA, port)).
+				SSHPrivateKey(cfg.SSH.PrivateKey).
+				ClientCommand()
+
+			serverScriptContent.WriteString(serverCmd.String() + "\n")
+			clientScriptContent.WriteString(clientCmd.String() + "\n")
+
+			port++
+		}
+	}
+
+	// Write server script file
+	if err := os.WriteFile(serverScriptFileName, []byte(serverScriptContent.String()), 0755); err != nil {
+		return port, fmt.Errorf("failed to write server script %s: %v", serverScriptFileName, err)
+	}
+
+	// Write client script file
+	if err := os.WriteFile(clientScriptFileName, []byte(clientScriptContent.String()), 0755); err != nil {
+		return port, fmt.Errorf("failed to write client script %s: %v", clientScriptFileName, err)
+	}
+
+	fmt.Printf("✅ Generated incast latency scripts for %s:%s (ports %d-%d)\n",
+		serverHost, serverHCA, startPort, port-1)
+
+	// Print first few lines of scripts for debugging
+	serverLines := strings.Split(serverScriptContent.String(), "\n")
+	if len(serverLines) > 0 {
+		fmt.Printf("   Server script preview (first command): %s\n", serverLines[0])
+	}
+	clientLines := strings.Split(clientScriptContent.String(), "\n")
+	if len(clientLines) > 0 {
+		fmt.Printf("   Client script preview (first command): %s\n", clientLines[0])
+	}
+
+	return port, nil
 }

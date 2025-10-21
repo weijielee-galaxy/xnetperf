@@ -8,8 +8,8 @@ import (
 	"xnetperf/config"
 )
 
-// TestCalculateTotalLatencyPorts tests the port calculation for latency tests
-func TestCalculateTotalLatencyPorts(t *testing.T) {
+// TestCalculateTotalLatencyPortsFullmesh tests the port calculation for fullmesh latency tests
+func TestCalculateTotalLatencyPortsFullmesh(t *testing.T) {
 	tests := []struct {
 		name     string
 		hosts    []string
@@ -44,16 +44,16 @@ func TestCalculateTotalLatencyPorts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := calculateTotalLatencyPorts(tt.hosts, tt.hcas)
+			result := calculateTotalLatencyPortsFullmesh(tt.hosts, tt.hcas)
 			if result != tt.expected {
-				t.Errorf("calculateTotalLatencyPorts() = %d, expected %d", result, tt.expected)
+				t.Errorf("calculateTotalLatencyPortsFullmesh() = %d, expected %d", result, tt.expected)
 			}
 		})
 	}
 }
 
-// TestCalculateTotalLatencyPortsFormula verifies the formula is correct
-func TestCalculateTotalLatencyPortsFormula(t *testing.T) {
+// TestCalculateTotalLatencyPortsFullmeshFormula verifies the formula is correct
+func TestCalculateTotalLatencyPortsFullmeshFormula(t *testing.T) {
 	// For N hosts with H HCAs each:
 	// Total HCAs = N * H
 	// Total connections = (N * H) * (N * H - 1)
@@ -65,7 +65,7 @@ func TestCalculateTotalLatencyPortsFormula(t *testing.T) {
 	}
 	hcas := []string{"mlx5_0", "mlx5_1", "mlx5_2", "mlx5_3"}
 
-	result := calculateTotalLatencyPorts(hosts, hcas)
+	result := calculateTotalLatencyPortsFullmesh(hosts, hcas)
 	totalHCAs := 10 * 4                     // 40 total HCAs
 	expected := totalHCAs * (totalHCAs - 1) // 40 * 39 = 1560 ports
 
@@ -185,11 +185,11 @@ func TestGenerateLatencyScriptForHCA(t *testing.T) {
 		"-R",   // RDMA-CM flag for ib_write_lat
 		"-x 3", // GID index flag for ib_write_lat
 		"--out_json",
-		"latency_s_host1_mlx5_0_from_host1_mlx5_1_p20000.json", // Same host, different HCA
-		"latency_s_host1_mlx5_0_from_host2_mlx5_0_p20001.json",
-		"latency_s_host1_mlx5_0_from_host2_mlx5_1_p20002.json",
-		"latency_s_host1_mlx5_0_from_host3_mlx5_0_p20003.json",
-		"latency_s_host1_mlx5_0_from_host3_mlx5_1_p20004.json",
+		"latency_fullmesh_s_host1_mlx5_0_from_host1_mlx5_1_p20000.json", // Same host, different HCA
+		"latency_fullmesh_s_host1_mlx5_0_from_host2_mlx5_0_p20001.json",
+		"latency_fullmesh_s_host1_mlx5_0_from_host2_mlx5_1_p20002.json",
+		"latency_fullmesh_s_host1_mlx5_0_from_host3_mlx5_0_p20003.json",
+		"latency_fullmesh_s_host1_mlx5_0_from_host3_mlx5_1_p20004.json",
 	}
 
 	for _, expected := range expectedServerElements {
@@ -237,11 +237,11 @@ func TestGenerateLatencyScriptForHCA(t *testing.T) {
 		"-R",   // RDMA-CM flag for ib_write_lat
 		"-x 3", // GID index flag for ib_write_lat
 		"--out_json",
-		"latency_c_host1_mlx5_1_to_host1_mlx5_0_p20000.json", // Same host, different HCA
-		"latency_c_host2_mlx5_0_to_host1_mlx5_0_p20001.json",
-		"latency_c_host2_mlx5_1_to_host1_mlx5_0_p20002.json",
-		"latency_c_host3_mlx5_0_to_host1_mlx5_0_p20003.json",
-		"latency_c_host3_mlx5_1_to_host1_mlx5_0_p20004.json",
+		"latency_fullmesh_c_host1_mlx5_1_to_host1_mlx5_0_p20000.json", // Same host, different HCA
+		"latency_fullmesh_c_host2_mlx5_0_to_host1_mlx5_0_p20001.json",
+		"latency_fullmesh_c_host2_mlx5_1_to_host1_mlx5_0_p20002.json",
+		"latency_fullmesh_c_host3_mlx5_0_to_host1_mlx5_0_p20003.json",
+		"latency_fullmesh_c_host3_mlx5_1_to_host1_mlx5_0_p20004.json",
 	}
 
 	for _, expected := range expectedClientElements {
@@ -323,14 +323,14 @@ func TestGenerateLatencyScriptForHCA_FilenameFormat(t *testing.T) {
 	serverStr := string(serverContent)
 
 	// First connection: same host, different HCA (node-a:mlx5_1 -> node-a:mlx5_0)
-	expectedServerFilename1 := "latency_s_node-a_mlx5_0_from_node-a_mlx5_1_p25000.json"
+	expectedServerFilename1 := "latency_fullmesh_s_node-a_mlx5_0_from_node-a_mlx5_1_p25000.json"
 	if !strings.Contains(serverStr, expectedServerFilename1) {
 		t.Errorf("Server script missing expected filename: %s", expectedServerFilename1)
 		t.Logf("Server script content:\n%s", serverStr)
 	}
 
 	// Second connection: different host (node-b:mlx5_1 -> node-a:mlx5_0)
-	expectedServerFilename2 := "latency_s_node-a_mlx5_0_from_node-b_mlx5_1_p25001.json"
+	expectedServerFilename2 := "latency_fullmesh_s_node-a_mlx5_0_from_node-b_mlx5_1_p25001.json"
 	if !strings.Contains(serverStr, expectedServerFilename2) {
 		t.Errorf("Server script missing expected filename: %s", expectedServerFilename2)
 		t.Logf("Server script content:\n%s", serverStr)
@@ -340,14 +340,14 @@ func TestGenerateLatencyScriptForHCA_FilenameFormat(t *testing.T) {
 	clientStr := string(clientContent)
 
 	// First connection: same host (node-a:mlx5_1 -> node-a:mlx5_0)
-	expectedClientFilename1 := "latency_c_node-a_mlx5_1_to_node-a_mlx5_0_p25000.json"
+	expectedClientFilename1 := "latency_fullmesh_c_node-a_mlx5_1_to_node-a_mlx5_0_p25000.json"
 	if !strings.Contains(clientStr, expectedClientFilename1) {
 		t.Errorf("Client script missing expected filename: %s", expectedClientFilename1)
 		t.Logf("Client script content:\n%s", clientStr)
 	}
 
 	// Second connection: different host (node-b:mlx5_1 -> node-a:mlx5_0)
-	expectedClientFilename2 := "latency_c_node-b_mlx5_1_to_node-a_mlx5_0_p25001.json"
+	expectedClientFilename2 := "latency_fullmesh_c_node-b_mlx5_1_to_node-a_mlx5_0_p25001.json"
 	if !strings.Contains(clientStr, expectedClientFilename2) {
 		t.Errorf("Client script missing expected filename: %s", expectedClientFilename2)
 		t.Logf("Client script content:\n%s", clientStr)

@@ -180,7 +180,13 @@ func executeLatencyAnalyzeStep(cfg *config.Config) bool {
 		return false
 	}
 
-	displayLatencyMatrix(latencyMatrix)
+	// Display based on stream type
+	if cfg.StreamType == config.InCast {
+		displayLatencyMatrixIncast(latencyMatrix, cfg)
+	} else {
+		// Default to fullmesh display
+		displayLatencyMatrix(latencyMatrix)
+	}
 
 	fmt.Println("✅ Latency analysis completed successfully")
 	return true
@@ -286,20 +292,31 @@ func collectLatencyReportData(reportsDir string) ([]LatencyData, error) {
 // parseLatencyReport parses a single latency JSON report file
 func parseLatencyReport(filePath string) (*LatencyData, error) {
 	// Parse filename to extract source, target, and HCA information
-	// Format: latency_c_sourceHost_sourceHCA_to_targetHost_targetHCA_pPORT.json
-	// Example: latency_c_host2_mlx5_0_to_host1_mlx5_1_p20000.json
+	// Formats:
+	//   Fullmesh: latency_fullmesh_c_sourceHost_sourceHCA_to_targetHost_targetHCA_pPORT.json
+	//   Incast:   latency_incast_c_sourceHost_sourceHCA_to_targetHost_targetHCA_pPORT.json
+	//   Legacy:   latency_c_sourceHost_sourceHCA_to_targetHost_targetHCA_pPORT.json
 	filename := filepath.Base(filePath)
 
 	// Remove extension
 	nameWithoutExt := strings.TrimSuffix(filename, ".json")
 
-	// Only process client reports (latency_c_*)
-	if !strings.HasPrefix(nameWithoutExt, "latency_c_") {
+	// Only process client reports (latency_*_c_* or latency_c_*)
+	if !strings.Contains(nameWithoutExt, "_c_") {
 		return nil, nil // Skip server reports
 	}
 
-	// Remove "latency_c_" prefix
-	remaining := strings.TrimPrefix(nameWithoutExt, "latency_c_")
+	// Remove prefix (latency_fullmesh_c_, latency_incast_c_, or latency_c_)
+	var remaining string
+	if strings.HasPrefix(nameWithoutExt, "latency_fullmesh_c_") {
+		remaining = strings.TrimPrefix(nameWithoutExt, "latency_fullmesh_c_")
+	} else if strings.HasPrefix(nameWithoutExt, "latency_incast_c_") {
+		remaining = strings.TrimPrefix(nameWithoutExt, "latency_incast_c_")
+	} else if strings.HasPrefix(nameWithoutExt, "latency_c_") {
+		remaining = strings.TrimPrefix(nameWithoutExt, "latency_c_")
+	} else {
+		return nil, fmt.Errorf("invalid filename format: %s", filename)
+	}
 
 	// Split by "_to_" to separate source and target
 	parts := strings.Split(remaining, "_to_")
@@ -836,4 +853,408 @@ func displayLatencyProbeResults(results []LatencyProbeResult) {
 
 	fmt.Printf("\nSummary: %d hosts running (%d processes), %d completed, %d errors\n",
 		running, totalProcesses, completed, errors)
+}
+
+// displayLatencyMatrixIncast displays the client×server latency matrix for incast mode
+func displayLatencyMatrixIncast(latencyData []LatencyData, cfg *config.Config) {
+	if len(latencyData) == 0 {
+		fmt.Println("⚠️  No latency data to display")
+		return
+	}
+
+	// Build matrix structure for incast mode (clients → servers)
+	clientHostHCAs := make(map[string][]string)   // client host -> []hca
+	serverHostHCAs := make(map[string][]string)   // server host -> []hca
+	matrix := make(map[string]map[string]float64) // "client:hca" -> "server:hca" -> latency
+
+	// Separate clients and servers based on config
+	clientHostSet := make(map[string]bool)
+	for _, host := range cfg.Client.Hostname {
+		clientHostSet[host] = true
+	}
+
+	for _, data := range latencyData {
+		// Determine if this is client→server or vice versa based on config
+		isClientToServer := clientHostSet[data.SourceHost]
+
+		if isClientToServer {
+			// Track client (source) hosts and HCAs
+			if clientHostHCAs[data.SourceHost] == nil {
+				clientHostHCAs[data.SourceHost] = []string{}
+			}
+			found := false
+			for _, hca := range clientHostHCAs[data.SourceHost] {
+				if hca == data.SourceHCA {
+					found = true
+					break
+				}
+			}
+			if !found {
+				clientHostHCAs[data.SourceHost] = append(clientHostHCAs[data.SourceHost], data.SourceHCA)
+			}
+
+			// Track server (target) hosts and HCAs
+			if serverHostHCAs[data.TargetHost] == nil {
+				serverHostHCAs[data.TargetHost] = []string{}
+			}
+			found = false
+			for _, hca := range serverHostHCAs[data.TargetHost] {
+				if hca == data.TargetHCA {
+					found = true
+					break
+				}
+			}
+			if !found {
+				serverHostHCAs[data.TargetHost] = append(serverHostHCAs[data.TargetHost], data.TargetHCA)
+			}
+
+			// Build matrix
+			clientKey := fmt.Sprintf("%s:%s", data.SourceHost, data.SourceHCA)
+			serverKey := fmt.Sprintf("%s:%s", data.TargetHost, data.TargetHCA)
+			if matrix[clientKey] == nil {
+				matrix[clientKey] = make(map[string]float64)
+			}
+			matrix[clientKey][serverKey] = data.AvgLatencyUs
+		}
+	}
+
+	// Sort hosts and their HCAs
+	var clientHosts []string
+	for host := range clientHostHCAs {
+		clientHosts = append(clientHosts, host)
+		sort.Strings(clientHostHCAs[host])
+	}
+	sort.Strings(clientHosts)
+
+	var serverHosts []string
+	for host := range serverHostHCAs {
+		serverHosts = append(serverHosts, host)
+		sort.Strings(serverHostHCAs[host])
+	}
+	sort.Strings(serverHosts)
+
+	// Calculate column widths
+	hostColWidth := 10
+	for _, host := range clientHosts {
+		if len(host) > hostColWidth && len(host) <= 20 {
+			hostColWidth = len(host)
+		} else if len(host) > 20 {
+			hostColWidth = 20
+		}
+	}
+	for _, host := range serverHosts {
+		if len(host) > hostColWidth && len(host) <= 20 {
+			hostColWidth = len(host)
+		} else if len(host) > 20 {
+			hostColWidth = 20
+		}
+	}
+
+	hcaColWidth := 10
+	for _, hcas := range clientHostHCAs {
+		for _, hca := range hcas {
+			if len(hca) > hcaColWidth && len(hca) <= 15 {
+				hcaColWidth = len(hca)
+			} else if len(hca) > 15 {
+				hcaColWidth = 15
+			}
+		}
+	}
+
+	valueColWidth := 12
+
+	// Print title
+	fmt.Println("\n" + strings.Repeat("=", 80))
+	fmt.Println("📊 Latency Matrix - INCAST Mode (Client → Server)")
+	fmt.Println("   Average Latency in microseconds")
+	fmt.Println(strings.Repeat("=", 80))
+
+	// Print top border
+	fmt.Printf("┌%s┬%s┬",
+		strings.Repeat("─", hostColWidth+2),
+		strings.Repeat("─", hcaColWidth+2))
+	for i, serverHost := range serverHosts {
+		numHCAs := len(serverHostHCAs[serverHost])
+		width := numHCAs*valueColWidth + (numHCAs-1)*3 + 2
+		if i < len(serverHosts)-1 {
+			fmt.Printf("%s┬", strings.Repeat("─", width))
+		} else {
+			fmt.Printf("%s┐\n", strings.Repeat("─", width))
+		}
+	}
+
+	// Print first header row (server hostnames)
+	fmt.Printf("│%*s│%*s│",
+		hostColWidth+2, " ",
+		hcaColWidth+2, " ")
+	for i, serverHost := range serverHosts {
+		numHCAs := len(serverHostHCAs[serverHost])
+		width := numHCAs*valueColWidth + (numHCAs-1)*3
+		displayHost := serverHost
+		if len(serverHost) > width {
+			displayHost = serverHost[:width-2] + ".."
+		}
+		if i < len(serverHosts)-1 {
+			fmt.Printf(" %-*s │", width, displayHost)
+		} else {
+			fmt.Printf(" %-*s │\n", width, displayHost)
+		}
+	}
+
+	// Print separator between hostname row and HCA row
+	fmt.Printf("│%*s│%*s├",
+		hostColWidth+2, " ",
+		hcaColWidth+2, " ")
+	for i, serverHost := range serverHosts {
+		hcas := serverHostHCAs[serverHost]
+		for j := range hcas {
+			if j < len(hcas)-1 {
+				fmt.Printf("%s┬", strings.Repeat("─", valueColWidth+2))
+			} else {
+				if i < len(serverHosts)-1 {
+					fmt.Printf("%s┼", strings.Repeat("─", valueColWidth+2))
+				} else {
+					fmt.Printf("%s┤\n", strings.Repeat("─", valueColWidth+2))
+				}
+			}
+		}
+	}
+
+	// Print second header row (server HCAs)
+	fmt.Printf("│%*s│%*s│",
+		hostColWidth+2, " ",
+		hcaColWidth+2, " ")
+	for i, serverHost := range serverHosts {
+		hcas := serverHostHCAs[serverHost]
+		for j, hca := range hcas {
+			displayHCA := hca
+			if len(hca) > valueColWidth {
+				displayHCA = hca[:valueColWidth-2] + ".."
+			}
+			if j < len(hcas)-1 || i < len(serverHosts)-1 {
+				fmt.Printf(" %-*s │", valueColWidth, displayHCA)
+			} else {
+				fmt.Printf(" %-*s │\n", valueColWidth, displayHCA)
+			}
+		}
+	}
+
+	// Print header separator
+	fmt.Printf("├%s┼%s┼",
+		strings.Repeat("─", hostColWidth+2),
+		strings.Repeat("─", hcaColWidth+2))
+	for i, serverHost := range serverHosts {
+		numHCAs := len(serverHostHCAs[serverHost])
+		for j := 0; j < numHCAs; j++ {
+			if j < numHCAs-1 {
+				fmt.Printf("%s┼", strings.Repeat("─", valueColWidth+2))
+			} else {
+				if i < len(serverHosts)-1 {
+					fmt.Printf("%s┼", strings.Repeat("─", valueColWidth+2))
+				} else {
+					fmt.Printf("%s┤\n", strings.Repeat("─", valueColWidth+2))
+				}
+			}
+		}
+	}
+
+	// Print data rows (clients)
+	for clientHostIdx, clientHostName := range clientHosts {
+		hcas := clientHostHCAs[clientHostName]
+		for hcaIdx, clientHCA := range hcas {
+			// Print client hostname (only on first HCA row)
+			if hcaIdx == 0 {
+				displayHost := clientHostName
+				if len(clientHostName) > hostColWidth {
+					displayHost = clientHostName[:hostColWidth-2] + ".."
+				}
+				fmt.Printf("│ %-*s │", hostColWidth, displayHost)
+			} else {
+				fmt.Printf("│%*s│", hostColWidth+2, " ")
+			}
+
+			// Print client HCA
+			displayHCA := clientHCA
+			if len(clientHCA) > hcaColWidth {
+				displayHCA = clientHCA[:hcaColWidth-2] + ".."
+			}
+			fmt.Printf(" %-*s │", hcaColWidth, displayHCA)
+
+			// Print latency values for all servers
+			clientKey := fmt.Sprintf("%s:%s", clientHostName, clientHCA)
+			for _, serverHost := range serverHosts {
+				serverHcas := serverHostHCAs[serverHost]
+				for _, serverHCA := range serverHcas {
+					serverKey := fmt.Sprintf("%s:%s", serverHost, serverHCA)
+					latency := matrix[clientKey][serverKey]
+					if latency > 0 {
+						fmt.Printf(" %*.2f μs │", valueColWidth-3, latency)
+					} else {
+						fmt.Printf(" %*s │", valueColWidth, "-")
+					}
+				}
+			}
+			fmt.Println()
+
+			// Print row separator
+			isLastHCA := hcaIdx == len(hcas)-1
+			isLastHost := clientHostIdx == len(clientHosts)-1
+
+			if isLastHost && isLastHCA {
+				// Last row - bottom border
+				fmt.Printf("└%s┴%s┴",
+					strings.Repeat("─", hostColWidth+2),
+					strings.Repeat("─", hcaColWidth+2))
+				for i, serverHost := range serverHosts {
+					numHCAs := len(serverHostHCAs[serverHost])
+					for j := 0; j < numHCAs; j++ {
+						if j < numHCAs-1 {
+							fmt.Printf("%s┴", strings.Repeat("─", valueColWidth+2))
+						} else {
+							if i < len(serverHosts)-1 {
+								fmt.Printf("%s┴", strings.Repeat("─", valueColWidth+2))
+							} else {
+								fmt.Printf("%s┘\n", strings.Repeat("─", valueColWidth+2))
+							}
+						}
+					}
+				}
+			} else if isLastHCA {
+				// End of host group - use crossing separator
+				fmt.Printf("├%s┼%s┼",
+					strings.Repeat("─", hostColWidth+2),
+					strings.Repeat("─", hcaColWidth+2))
+				for i, serverHost := range serverHosts {
+					numHCAs := len(serverHostHCAs[serverHost])
+					for j := 0; j < numHCAs; j++ {
+						if j < numHCAs-1 {
+							fmt.Printf("%s┼", strings.Repeat("─", valueColWidth+2))
+						} else {
+							if i < len(serverHosts)-1 {
+								fmt.Printf("%s┼", strings.Repeat("─", valueColWidth+2))
+							} else {
+								fmt.Printf("%s┤\n", strings.Repeat("─", valueColWidth+2))
+							}
+						}
+					}
+				}
+			} else {
+				// Within host group - use non-crossing separator
+				fmt.Printf("│%*s├%s┼",
+					hostColWidth+2, " ",
+					strings.Repeat("─", hcaColWidth+2))
+				for i, serverHost := range serverHosts {
+					numHCAs := len(serverHostHCAs[serverHost])
+					for j := 0; j < numHCAs; j++ {
+						if j < numHCAs-1 {
+							fmt.Printf("%s┼", strings.Repeat("─", valueColWidth+2))
+						} else {
+							if i < len(serverHosts)-1 {
+								fmt.Printf("%s┼", strings.Repeat("─", valueColWidth+2))
+							} else {
+								fmt.Printf("%s┤\n", strings.Repeat("─", valueColWidth+2))
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Calculate and display statistics
+	displayIncastStatistics(latencyData, clientHostHCAs, serverHostHCAs)
+}
+
+// displayIncastStatistics calculates and displays statistics for incast mode
+func displayIncastStatistics(latencyData []LatencyData, clientHostHCAs map[string][]string, serverHostHCAs map[string][]string) {
+	if len(latencyData) == 0 {
+		return
+	}
+
+	// Calculate global statistics
+	var allLatencies []float64
+	for _, data := range latencyData {
+		allLatencies = append(allLatencies, data.AvgLatencyUs)
+	}
+
+	sort.Float64s(allLatencies)
+	minLatency := allLatencies[0]
+	maxLatency := allLatencies[len(allLatencies)-1]
+	var sum float64
+	for _, lat := range allLatencies {
+		sum += lat
+	}
+	avgLatency := sum / float64(len(allLatencies))
+
+	// Calculate per-server statistics
+	serverStats := make(map[string][]float64)
+	for _, data := range latencyData {
+		serverKey := fmt.Sprintf("%s:%s", data.TargetHost, data.TargetHCA)
+		serverStats[serverKey] = append(serverStats[serverKey], data.AvgLatencyUs)
+	}
+
+	// Calculate per-client statistics
+	clientStats := make(map[string][]float64)
+	for _, data := range latencyData {
+		clientKey := fmt.Sprintf("%s:%s", data.SourceHost, data.SourceHCA)
+		clientStats[clientKey] = append(clientStats[clientKey], data.AvgLatencyUs)
+	}
+
+	// Print statistics
+	fmt.Println("\n" + strings.Repeat("=", 80))
+	fmt.Println("📈 Statistics Summary")
+	fmt.Println(strings.Repeat("=", 80))
+
+	// Global statistics
+	fmt.Println("\n🌐 Global Statistics:")
+	fmt.Printf("   Total measurements: %d\n", len(allLatencies))
+	fmt.Printf("   Minimum latency:    %.2f μs\n", minLatency)
+	fmt.Printf("   Maximum latency:    %.2f μs\n", maxLatency)
+	fmt.Printf("   Average latency:    %.2f μs\n", avgLatency)
+
+	// Per-server statistics
+	fmt.Println("\n🖥️  Per-Server Average Latency:")
+	var serverHosts []string
+	for host := range serverHostHCAs {
+		serverHosts = append(serverHosts, host)
+	}
+	sort.Strings(serverHosts)
+
+	for _, host := range serverHosts {
+		for _, hca := range serverHostHCAs[host] {
+			serverKey := fmt.Sprintf("%s:%s", host, hca)
+			if latencies, ok := serverStats[serverKey]; ok && len(latencies) > 0 {
+				var sum float64
+				for _, lat := range latencies {
+					sum += lat
+				}
+				avg := sum / float64(len(latencies))
+				fmt.Printf("   %-30s  %.2f μs  (%d clients)\n", serverKey, avg, len(latencies))
+			}
+		}
+	}
+
+	// Per-client statistics
+	fmt.Println("\n💻 Per-Client Average Latency:")
+	var clientHosts []string
+	for host := range clientHostHCAs {
+		clientHosts = append(clientHosts, host)
+	}
+	sort.Strings(clientHosts)
+
+	for _, host := range clientHosts {
+		for _, hca := range clientHostHCAs[host] {
+			clientKey := fmt.Sprintf("%s:%s", host, hca)
+			if latencies, ok := clientStats[clientKey]; ok && len(latencies) > 0 {
+				var sum float64
+				for _, lat := range latencies {
+					sum += lat
+				}
+				avg := sum / float64(len(latencies))
+				fmt.Printf("   %-30s  %.2f μs  (%d servers)\n", clientKey, avg, len(latencies))
+			}
+		}
+	}
+
+	fmt.Println(strings.Repeat("=", 80))
 }
