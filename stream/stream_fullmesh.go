@@ -59,7 +59,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 					fmt.Println("num:", num, "client HCA:", allHost, "Client HCA:", hcaClient, port, Server)
 
 					// 使用命令构建器创建服务器命令
-					serverCmd := NewIBWriteBWCommandBuilder().
+					serverCmd := NewIBWriteBWCommandBuilder(true).
 						Host(Server).
 						Device(hcaServer).
 						MessageSize(cfg.MessageSizeBytes).
@@ -75,7 +75,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 						ServerCommand() // 服务器命令不需要目标IP
 
 					// 使用命令构建器创建客户端命令
-					clientCmd := NewIBWriteBWCommandBuilder().
+					clientCmd := NewIBWriteBWCommandBuilder(true).
 						Host(allHost).
 						Device(hcaClient).
 						MessageSize(cfg.MessageSizeBytes).

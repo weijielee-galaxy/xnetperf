@@ -184,7 +184,7 @@ func generateLatencyScriptForHCA(
 				continue // Skip testing same HCA to itself
 			}
 			// Generate server command (runs on current host)
-			serverCmd := NewIBWriteBWCommandBuilder().
+			serverCmd := NewIBWriteBWCommandBuilder(true).
 				Host(currentHost).
 				Device(currentHCA).
 				Port(port).
@@ -200,7 +200,7 @@ func generateLatencyScriptForHCA(
 				ServerCommand()
 
 			// Generate client command (connects from target to current host)
-			clientCmd := NewIBWriteBWCommandBuilder().
+			clientCmd := NewIBWriteBWCommandBuilder(true).
 				Host(targetHost).
 				Device(targetHCA).
 				Port(port).
@@ -322,6 +322,7 @@ func runLatencyScriptsIncast(cfg *config.Config, outputDir string) error {
 			if err := executeScript(serverScript); err != nil {
 				return fmt.Errorf("failed to execute server script %s: %v", serverScript, err)
 			}
+			time.Sleep(time.Millisecond * 100)
 		}
 	}
 
@@ -338,9 +339,11 @@ func runLatencyScriptsIncast(cfg *config.Config, outputDir string) error {
 				outputDir, clientHost, clientHCA)
 
 			fmt.Printf("  Executing: bash %s\n", clientScript)
+			time.Sleep(time.Millisecond * 100)
 			if err := executeScript(clientScript); err != nil {
 				return fmt.Errorf("failed to execute client script %s: %v", clientScript, err)
 			}
+			time.Sleep(time.Millisecond * 100)
 		}
 	}
 
@@ -428,7 +431,7 @@ func generateLatencyScriptForClientHCAIncast(
 		serverIP := serverIPs[serverHost]
 		for _, serverHCA := range cfg.Server.Hca {
 			// Generate server command (runs on server host)
-			serverCmd := NewIBWriteBWCommandBuilder().
+			serverCmd := NewIBWriteBWCommandBuilder(true).
 				Host(serverHost).
 				Device(serverHCA).
 				Port(port).
@@ -444,7 +447,7 @@ func generateLatencyScriptForClientHCAIncast(
 				ServerCommand()
 
 			// Generate client command (connects from client to server)
-			clientCmd := NewIBWriteBWCommandBuilder().
+			clientCmd := NewIBWriteBWCommandBuilder(true).
 				Host(clientHost).
 				Device(clientHCA).
 				Port(port).

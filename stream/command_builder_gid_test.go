@@ -30,7 +30,7 @@ func TestGidIndexParameter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := NewIBWriteBWCommandBuilder().
+			cmd := NewIBWriteBWCommandBuilder(true).
 				Device("mlx5_0").
 				Port(20000).
 				GidIndex(tt.gidIndex).
@@ -54,7 +54,7 @@ func TestGidIndexParameter(t *testing.T) {
 
 func TestGidIndexWithRdmaCm(t *testing.T) {
 	// Test that gid_index and rdma_cm can be used together
-	cmd := NewIBWriteBWCommandBuilder().
+	cmd := NewIBWriteBWCommandBuilder(true).
 		Device("mlx5_0").
 		Port(20000).
 		RdmaCm(true).
@@ -75,7 +75,7 @@ func TestGidIndexWithRdmaCm(t *testing.T) {
 
 func TestGidIndexInFullCommand(t *testing.T) {
 	// Test GID index in a complete command with all parameters
-	cmd := NewIBWriteBWCommandBuilder().
+	cmd := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		QueuePairNum(10).

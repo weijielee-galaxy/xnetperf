@@ -29,13 +29,13 @@ type IBWriteBWCommandBuilder struct {
 }
 
 // NewIBWriteBWCommandBuilder creates a new command builder
-func NewIBWriteBWCommandBuilder() *IBWriteBWCommandBuilder {
+func NewIBWriteBWCommandBuilder(sshWrapper bool) *IBWriteBWCommandBuilder {
 	return &IBWriteBWCommandBuilder{
 		runInfinitely:  true,
 		redirectOutput: ">/dev/null 2>&1",
 		background:     true,
 		sleepTime:      "0.02",
-		sshWrapper:     true,
+		sshWrapper:     sshWrapper,
 	}
 }
 

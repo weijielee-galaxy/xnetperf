@@ -40,7 +40,7 @@ func GenerateIncastScripts(cfg *config.Config) {
 			for _, cHost := range cfg.Client.Hostname {
 				for _, cHca := range cfg.Client.Hca {
 					// 使用命令构建器创建服务器命令
-					serverCmd := NewIBWriteBWCommandBuilder().
+					serverCmd := NewIBWriteBWCommandBuilder(true).
 						Host(sHost).
 						Device(sHca).
 						QueuePairNum(cfg.QpNum).
@@ -56,7 +56,7 @@ func GenerateIncastScripts(cfg *config.Config) {
 						ServerCommand() // 服务器命令不需要目标IP
 
 					// 使用命令构建器创建客户端命令
-					clientCmd := NewIBWriteBWCommandBuilder().
+					clientCmd := NewIBWriteBWCommandBuilder(true).
 						Host(cHost).
 						Device(cHca).
 						QueuePairNum(cfg.QpNum).
@@ -112,7 +112,7 @@ func GenerateIncastScriptsV2(cfg *config.Config) {
 			fmt.Println("\t", sHca)
 			for _, cHost := range cfg.Client.Hostname {
 				for _, cHca := range cfg.Client.Hca {
-					serverCmd := NewIBWriteBWCommandBuilder().
+					serverCmd := NewIBWriteBWCommandBuilder(true).
 						Host(sHost).
 						Device(sHca).
 						QueuePairNum(cfg.QpNum).

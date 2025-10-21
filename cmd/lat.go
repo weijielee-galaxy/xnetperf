@@ -84,6 +84,10 @@ func runLat(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
+	// Short delay before collection
+	fmt.Println("⏳ Waiting for 2 seconds before collecting reports...")
+	time.Sleep(time.Second * 2)
+
 	// Step 4: Collect reports
 	fmt.Println("\n📥 Step 4/5: Collecting latency reports...")
 	if !executeLatencyCollectStep(cfg) {
@@ -445,30 +449,31 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 	}
 	sort.Strings(targetHosts)
 
-	// Calculate column widths
+	// Calculate column widths - no truncation, use actual max length
 	hostColWidth := 10 // Minimum width for hostname column
 	for _, host := range sourceHosts {
-		if len(host) > hostColWidth && len(host) <= 20 {
+		if len(host) > hostColWidth {
 			hostColWidth = len(host)
-		} else if len(host) > 20 {
-			hostColWidth = 20 // Cap at 20
 		}
 	}
 	for _, host := range targetHosts {
-		if len(host) > hostColWidth && len(host) <= 20 {
+		if len(host) > hostColWidth {
 			hostColWidth = len(host)
-		} else if len(host) > 20 {
-			hostColWidth = 20
 		}
 	}
 
 	hcaColWidth := 10 // Minimum width for HCA column
 	for _, hcas := range sourceHostHCAs {
 		for _, hca := range hcas {
-			if len(hca) > hcaColWidth && len(hca) <= 15 {
+			if len(hca) > hcaColWidth {
 				hcaColWidth = len(hca)
-			} else if len(hca) > 15 {
-				hcaColWidth = 15 // Cap at 15
+			}
+		}
+	}
+	for _, hcas := range targetHostHCAs {
+		for _, hca := range hcas {
+			if len(hca) > hcaColWidth {
+				hcaColWidth = len(hca)
 			}
 		}
 	}
@@ -508,8 +513,9 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 		numHCAs := len(targetHostHCAs[targetHost])
 		width := numHCAs*valueColWidth + (numHCAs-1)*3
 		displayHost := targetHost
+		// No truncation - expand width if needed
 		if len(targetHost) > width {
-			displayHost = targetHost[:width-2] + ".."
+			width = len(targetHost)
 		}
 		if i < len(targetHosts)-1 {
 			fmt.Printf(" %-*s │", width, displayHost)
@@ -545,13 +551,15 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 		hcas := targetHostHCAs[targetHost]
 		for j, hca := range hcas {
 			displayHCA := hca
+			// Calculate actual width needed for this HCA column
+			actualWidth := valueColWidth
 			if len(hca) > valueColWidth {
-				displayHCA = hca[:valueColWidth-2] + ".."
+				actualWidth = len(hca)
 			}
 			if j < len(hcas)-1 || i < len(targetHosts)-1 {
-				fmt.Printf(" %-*s │", valueColWidth, displayHCA)
+				fmt.Printf(" %-*s │", actualWidth, displayHCA)
 			} else {
-				fmt.Printf(" %-*s │\n", valueColWidth, displayHCA)
+				fmt.Printf(" %-*s │\n", actualWidth, displayHCA)
 			}
 		}
 	}
@@ -573,22 +581,16 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 	for _, sourceHost := range sourceHosts {
 		sourceHCAs := sourceHostHCAs[sourceHost]
 		for hcaIdx, sourceHCA := range sourceHCAs {
-			// Print hostname in first column (only for first HCA of this host)
+			// Print hostname in first column (only for first HCA of this host) - no truncation
 			if hcaIdx == 0 {
 				displayHost := sourceHost
-				if len(sourceHost) > hostColWidth {
-					displayHost = sourceHost[:hostColWidth-2] + ".."
-				}
 				fmt.Printf("│ %-*s │", hostColWidth, displayHost)
 			} else {
 				fmt.Printf("│%*s│", hostColWidth+2, " ")
 			}
 
-			// Print HCA in second column
+			// Print HCA in second column - no truncation
 			displayHCA := sourceHCA
-			if len(sourceHCA) > hcaColWidth {
-				displayHCA = sourceHCA[:hcaColWidth-2] + ".."
-			}
 			fmt.Printf(" %-*s │", hcaColWidth, displayHCA)
 
 			// Print latency values
@@ -933,30 +935,31 @@ func displayLatencyMatrixIncast(latencyData []LatencyData, cfg *config.Config) {
 	}
 	sort.Strings(serverHosts)
 
-	// Calculate column widths
+	// Calculate column widths - no truncation, use actual max length
 	hostColWidth := 10
 	for _, host := range clientHosts {
-		if len(host) > hostColWidth && len(host) <= 20 {
+		if len(host) > hostColWidth {
 			hostColWidth = len(host)
-		} else if len(host) > 20 {
-			hostColWidth = 20
 		}
 	}
 	for _, host := range serverHosts {
-		if len(host) > hostColWidth && len(host) <= 20 {
+		if len(host) > hostColWidth {
 			hostColWidth = len(host)
-		} else if len(host) > 20 {
-			hostColWidth = 20
 		}
 	}
 
 	hcaColWidth := 10
 	for _, hcas := range clientHostHCAs {
 		for _, hca := range hcas {
-			if len(hca) > hcaColWidth && len(hca) <= 15 {
+			if len(hca) > hcaColWidth {
 				hcaColWidth = len(hca)
-			} else if len(hca) > 15 {
-				hcaColWidth = 15
+			}
+		}
+	}
+	for _, hcas := range serverHostHCAs {
+		for _, hca := range hcas {
+			if len(hca) > hcaColWidth {
+				hcaColWidth = len(hca)
 			}
 		}
 	}
@@ -991,8 +994,9 @@ func displayLatencyMatrixIncast(latencyData []LatencyData, cfg *config.Config) {
 		numHCAs := len(serverHostHCAs[serverHost])
 		width := numHCAs*valueColWidth + (numHCAs-1)*3
 		displayHost := serverHost
+		// No truncation - expand width if needed
 		if len(serverHost) > width {
-			displayHost = serverHost[:width-2] + ".."
+			width = len(serverHost)
 		}
 		if i < len(serverHosts)-1 {
 			fmt.Printf(" %-*s │", width, displayHost)
@@ -1028,13 +1032,15 @@ func displayLatencyMatrixIncast(latencyData []LatencyData, cfg *config.Config) {
 		hcas := serverHostHCAs[serverHost]
 		for j, hca := range hcas {
 			displayHCA := hca
+			// Calculate actual width needed for this HCA column
+			actualWidth := valueColWidth
 			if len(hca) > valueColWidth {
-				displayHCA = hca[:valueColWidth-2] + ".."
+				actualWidth = len(hca)
 			}
 			if j < len(hcas)-1 || i < len(serverHosts)-1 {
-				fmt.Printf(" %-*s │", valueColWidth, displayHCA)
+				fmt.Printf(" %-*s │", actualWidth, displayHCA)
 			} else {
-				fmt.Printf(" %-*s │\n", valueColWidth, displayHCA)
+				fmt.Printf(" %-*s │\n", actualWidth, displayHCA)
 			}
 		}
 	}
@@ -1062,22 +1068,16 @@ func displayLatencyMatrixIncast(latencyData []LatencyData, cfg *config.Config) {
 	for clientHostIdx, clientHostName := range clientHosts {
 		hcas := clientHostHCAs[clientHostName]
 		for hcaIdx, clientHCA := range hcas {
-			// Print client hostname (only on first HCA row)
+			// Print client hostname (only on first HCA row) - no truncation
 			if hcaIdx == 0 {
 				displayHost := clientHostName
-				if len(clientHostName) > hostColWidth {
-					displayHost = clientHostName[:hostColWidth-2] + ".."
-				}
 				fmt.Printf("│ %-*s │", hostColWidth, displayHost)
 			} else {
 				fmt.Printf("│%*s│", hostColWidth+2, " ")
 			}
 
-			// Print client HCA
+			// Print client HCA - no truncation
 			displayHCA := clientHCA
-			if len(clientHCA) > hcaColWidth {
-				displayHCA = clientHCA[:hcaColWidth-2] + ".."
-			}
 			fmt.Printf(" %-*s │", hcaColWidth, displayHCA)
 
 			// Print latency values for all servers
