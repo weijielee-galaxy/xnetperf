@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// IBWriteBWCommandBuilder represents a builder for ib_write_bw commands
+// IBWriteBWCommandBuilder represents a builder for ib_write_bw and ib_write_lat commands
 type IBWriteBWCommandBuilder struct {
 	host            string
 	device          string
@@ -25,16 +25,17 @@ type IBWriteBWCommandBuilder struct {
 	bidirectional   bool // 新增双向测试参数
 	rdmaCm          bool // RDMA CM参数
 	gidIndex        int  // GID index for RoCE v2
+	latencyTest     bool // 延迟测试模式 (use ib_write_lat instead of ib_write_bw)
 }
 
 // NewIBWriteBWCommandBuilder creates a new command builder
-func NewIBWriteBWCommandBuilder() *IBWriteBWCommandBuilder {
+func NewIBWriteBWCommandBuilder(sshWrapper bool) *IBWriteBWCommandBuilder {
 	return &IBWriteBWCommandBuilder{
 		runInfinitely:  true,
 		redirectOutput: ">/dev/null 2>&1",
 		background:     true,
 		sleepTime:      "0.02",
-		sshWrapper:     true,
+		sshWrapper:     sshWrapper,
 	}
 }
 
@@ -146,6 +147,12 @@ func (b *IBWriteBWCommandBuilder) GidIndex(index int) *IBWriteBWCommandBuilder {
 	return b
 }
 
+// ForLatencyTest switches to latency test mode (use ib_write_lat instead of ib_write_bw)
+func (b *IBWriteBWCommandBuilder) ForLatencyTest(enable bool) *IBWriteBWCommandBuilder {
+	b.latencyTest = enable
+	return b
+}
+
 // String builds and returns the complete command string
 func (b *IBWriteBWCommandBuilder) String() string {
 	// Validate that outputFileName is provided when report is enabled and not running infinitely
@@ -163,7 +170,12 @@ func (b *IBWriteBWCommandBuilder) String() string {
 		}
 	}
 
-	cmd.WriteString("ib_write_bw")
+	// Use ib_write_lat for latency tests, ib_write_bw for bandwidth tests
+	if b.latencyTest {
+		cmd.WriteString("ib_write_lat")
+	} else {
+		cmd.WriteString("ib_write_bw")
+	}
 
 	if b.device != "" {
 		cmd.WriteString(fmt.Sprintf(" -d %s", b.device))
@@ -175,12 +187,16 @@ func (b *IBWriteBWCommandBuilder) String() string {
 		cmd.WriteString(fmt.Sprintf(" -D %d", b.durationSeconds))
 	}
 
-	if b.queuePairNum > 0 {
-		cmd.WriteString(fmt.Sprintf(" -q %d", b.queuePairNum))
-	}
+	// Queue pair and message size parameters are not used in latency tests
+	// ib_write_lat tests single message latency
+	if !b.latencyTest {
+		if b.queuePairNum > 0 {
+			cmd.WriteString(fmt.Sprintf(" -q %d", b.queuePairNum))
+		}
 
-	if b.messageSize > 0 {
-		cmd.WriteString(fmt.Sprintf(" -m %d", b.messageSize))
+		if b.messageSize > 0 {
+			cmd.WriteString(fmt.Sprintf(" -m %d", b.messageSize))
+		}
 	}
 
 	if b.port > 0 {
@@ -205,9 +221,18 @@ func (b *IBWriteBWCommandBuilder) String() string {
 
 	// Add report parameters if report is enabled and not running infinitely
 	if b.report && !b.runInfinitely {
-		cmd.WriteString(" --report_gbits --out_json")
-		if b.outputFileName != "" {
-			cmd.WriteString(fmt.Sprintf(" --out_json_file %s", b.outputFileName))
+		if b.latencyTest {
+			// For latency tests, use --out_json and --out_json_file (same as bandwidth)
+			cmd.WriteString(" --out_json")
+			if b.outputFileName != "" {
+				cmd.WriteString(fmt.Sprintf(" --out_json_file %s", b.outputFileName))
+			}
+		} else {
+			// For bandwidth tests, use --report_gbits and --out_json
+			cmd.WriteString(" --report_gbits --out_json")
+			if b.outputFileName != "" {
+				cmd.WriteString(fmt.Sprintf(" --out_json_file %s", b.outputFileName))
+			}
 		}
 	}
 
@@ -237,5 +262,5 @@ func (b *IBWriteBWCommandBuilder) ServerCommand() *IBWriteBWCommandBuilder {
 
 // ClientCommand creates a client command with target IP
 func (b *IBWriteBWCommandBuilder) ClientCommand() *IBWriteBWCommandBuilder {
-	return b.SleepTime("0.06") // Client commands typically have longer sleep
+	return b // Client commands typically have longer sleep
 }

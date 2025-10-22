@@ -28,11 +28,23 @@ Examples:
 
   # Execute with custom config file
   xnetperf execute -c /path/to/config.yaml`,
-	Run: runExecute,
+	Run: doRunExecute,
 }
 
-func init() {
-	// No additional flags needed - uses global config flag
+func doRunExecute(cmd *cobra.Command, args []string) {
+	cfg, err := config.LoadConfig(cfgFile)
+	if err != nil {
+		fmt.Printf("❌ Error loading config: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println(cfgFile)
+	fmt.Println(cfg.Version, cfg.Version == "v1")
+
+	if cfg.Version == "v1" {
+		runExecuteV1(cmd, args)
+	} else {
+		runExecute(cmd, args)
+	}
 }
 
 func runExecute(cmd *cobra.Command, args []string) {

@@ -34,3 +34,6 @@ client:
   hca:
   - "mlx5_0"
   - "mlx5_1"
+
+
+version: "v0"

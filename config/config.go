@@ -31,6 +31,7 @@ type Config struct {
 	SSH                SSH          `yaml:"ssh" json:"ssh"`
 	Server             ServerConfig `yaml:"server" json:"server"`
 	Client             ClientConfig `yaml:"client" json:"client"`
+	Version            string       `yaml:"version" json:"version"`
 }
 
 type Report struct {

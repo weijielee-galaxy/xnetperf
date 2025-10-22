@@ -7,7 +7,7 @@ import (
 )
 
 func TestBuilder(t *testing.T) {
-	cmdBuilder := NewIBWriteBWCommandBuilder().
+	cmdBuilder := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		RunInfinitely(false).
@@ -28,7 +28,7 @@ func TestBuilder(t *testing.T) {
 }
 
 func TestNewIBWriteBWCommandBuilder(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 
 	if builder == nil {
 		t.Fatal("NewIBWriteBWCommandBuilder should not return nil")
@@ -57,7 +57,7 @@ func TestNewIBWriteBWCommandBuilder(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_ChainableMethods(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 
 	// Test that all methods return *IBWriteBWCommandBuilder for chaining
 	result := builder.Host("testhost").
@@ -77,7 +77,7 @@ func TestIBWriteBWCommandBuilder_ChainableMethods(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_Host(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.Host("test-host")
 
 	if builder.host != "test-host" {
@@ -86,7 +86,7 @@ func TestIBWriteBWCommandBuilder_Host(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_Device(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.Device("mlx5_1")
 
 	if builder.device != "mlx5_1" {
@@ -95,7 +95,7 @@ func TestIBWriteBWCommandBuilder_Device(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_RunInfinitely(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.RunInfinitely(false)
 
 	if builder.runInfinitely {
@@ -104,7 +104,7 @@ func TestIBWriteBWCommandBuilder_RunInfinitely(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_DurationSeconds(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.DurationSeconds(30)
 
 	if builder.durationSeconds != 30 {
@@ -113,7 +113,7 @@ func TestIBWriteBWCommandBuilder_DurationSeconds(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_QueuePairNum(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.QueuePairNum(15)
 
 	if builder.queuePairNum != 15 {
@@ -122,7 +122,7 @@ func TestIBWriteBWCommandBuilder_QueuePairNum(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_MessageSize(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.MessageSize(8192)
 
 	if builder.messageSize != 8192 {
@@ -131,7 +131,7 @@ func TestIBWriteBWCommandBuilder_MessageSize(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_Port(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.Port(25000)
 
 	if builder.port != 25000 {
@@ -140,7 +140,7 @@ func TestIBWriteBWCommandBuilder_Port(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_TargetIP(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.TargetIP("10.0.0.1")
 
 	if builder.targetIP != "10.0.0.1" {
@@ -149,7 +149,7 @@ func TestIBWriteBWCommandBuilder_TargetIP(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_RedirectOutput(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.RedirectOutput(">test.log 2>&1")
 
 	if builder.redirectOutput != ">test.log 2>&1" {
@@ -158,7 +158,7 @@ func TestIBWriteBWCommandBuilder_RedirectOutput(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_Background(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.Background(false)
 
 	if builder.background {
@@ -167,7 +167,7 @@ func TestIBWriteBWCommandBuilder_Background(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_SleepTime(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.SleepTime("0.1")
 
 	if builder.sleepTime != "0.1" {
@@ -176,7 +176,7 @@ func TestIBWriteBWCommandBuilder_SleepTime(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_SSHWrapper(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.SSHWrapper(false)
 
 	if builder.sshWrapper {
@@ -185,7 +185,7 @@ func TestIBWriteBWCommandBuilder_SSHWrapper(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_Report(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.Report(true)
 
 	if !builder.report {
@@ -194,7 +194,7 @@ func TestIBWriteBWCommandBuilder_Report(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_OutputFileName(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.OutputFileName("test_report.json")
 
 	if builder.outputFileName != "test_report.json" {
@@ -203,7 +203,7 @@ func TestIBWriteBWCommandBuilder_OutputFileName(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_ServerCommand(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.TargetIP("192.168.1.100") // Set an IP first
 	result := builder.ServerCommand()
 
@@ -217,7 +217,7 @@ func TestIBWriteBWCommandBuilder_ServerCommand(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_ClientCommand(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	result := builder.ClientCommand()
 
 	if result != builder {
@@ -230,7 +230,7 @@ func TestIBWriteBWCommandBuilder_ClientCommand(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_BasicServer(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-server").
 		Device("mlx5_0").
 		QueuePairNum(10).
@@ -247,7 +247,7 @@ func TestIBWriteBWCommandBuilder_String_BasicServer(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_BasicClient(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-client").
 		Device("mlx5_1").
 		QueuePairNum(5).
@@ -265,7 +265,7 @@ func TestIBWriteBWCommandBuilder_String_BasicClient(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_NoSSHWrapper(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		Port(20000).
@@ -281,7 +281,7 @@ func TestIBWriteBWCommandBuilder_String_NoSSHWrapper(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_MinimalCommand(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		RunInfinitely(false).
 		Background(false).
 		RedirectOutput("").
@@ -297,7 +297,7 @@ func TestIBWriteBWCommandBuilder_String_MinimalCommand(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_AllParameters(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("full-test").
 		Device("mlx5_7").
 		RunInfinitely(true).
@@ -319,7 +319,7 @@ func TestIBWriteBWCommandBuilder_String_AllParameters(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_ZeroValues(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		QueuePairNum(0).
 		MessageSize(0).
 		Port(0)
@@ -339,7 +339,7 @@ func TestIBWriteBWCommandBuilder_String_ZeroValues(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_EmptyStrings(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Device("").
 		TargetIP("").
 		RedirectOutput("").
@@ -357,7 +357,7 @@ func TestIBWriteBWCommandBuilder_String_EmptyStrings(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_WithDuration(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		RunInfinitely(false).
@@ -373,7 +373,7 @@ func TestIBWriteBWCommandBuilder_String_WithDuration(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_DurationIgnoredWhenInfinite(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		RunInfinitely(true).
@@ -397,7 +397,7 @@ func TestIBWriteBWCommandBuilder_String_DurationIgnoredWhenInfinite(t *testing.T
 }
 
 func TestIBWriteBWCommandBuilder_String_NoDurationWhenZero(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		RunInfinitely(false).
@@ -417,7 +417,7 @@ func TestIBWriteBWCommandBuilder_String_NoDurationWhenZero(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_WithReport(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		Port(20000).
@@ -435,7 +435,7 @@ func TestIBWriteBWCommandBuilder_String_WithReport(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_WithReportNoTargetIP(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		Port(20000).
@@ -453,7 +453,7 @@ func TestIBWriteBWCommandBuilder_String_WithReportNoTargetIP(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_NoReportParameters(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		Port(20000).
@@ -474,7 +474,7 @@ func TestIBWriteBWCommandBuilder_String_NoReportParameters(t *testing.T) {
 }
 
 func TestIBWriteBWCommandBuilder_String_ReportWithoutFileName_ShouldPanic(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		Port(20000).
@@ -492,7 +492,7 @@ func TestIBWriteBWCommandBuilder_String_ReportWithoutFileName_ShouldPanic(t *tes
 }
 
 func TestIBWriteBWCommandBuilder_String_ReportWithEmptyFileName_ShouldPanic(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		Port(20000).
@@ -510,7 +510,7 @@ func TestIBWriteBWCommandBuilder_String_ReportWithEmptyFileName_ShouldPanic(t *t
 }
 
 func TestIBWriteBWCommandBuilder_String_ReportIgnoredWhenInfinite(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		Port(20000).
@@ -539,7 +539,7 @@ func TestIBWriteBWCommandBuilder_String_ReportIgnoredWhenInfinite(t *testing.T) 
 
 func TestIBWriteBWCommandBuilder_String_ReportWithInfiniteNoFilenameRequired(t *testing.T) {
 	// When runInfinitely is true, report should be ignored and no filename should be required
-	builder := NewIBWriteBWCommandBuilder().
+	builder := NewIBWriteBWCommandBuilder(true).
 		Host("test-host").
 		Device("mlx5_0").
 		Port(20000).
@@ -560,7 +560,7 @@ func TestIBWriteBWCommandBuilder_String_ReportWithInfiniteNoFilenameRequired(t *
 }
 
 func TestRdmaCm(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 
 	// Test RdmaCm method returns builder for chaining
 	result := builder.RdmaCm(true)
@@ -576,7 +576,7 @@ func TestRdmaCm(t *testing.T) {
 	}
 
 	// Test RdmaCm disabled
-	builder2 := NewIBWriteBWCommandBuilder()
+	builder2 := NewIBWriteBWCommandBuilder(true)
 	builder2.Host("test-host").Device("mlx5_0").Port(20000).RdmaCm(false)
 	cmd2 := builder2.String()
 	if strings.Contains(cmd2, " -R") {
@@ -585,7 +585,7 @@ func TestRdmaCm(t *testing.T) {
 }
 
 func TestRdmaCmWithOtherFlags(t *testing.T) {
-	builder := NewIBWriteBWCommandBuilder()
+	builder := NewIBWriteBWCommandBuilder(true)
 	builder.Host("test-host").
 		Device("mlx5_0").
 		Port(20000).
@@ -611,5 +611,232 @@ func TestRdmaCmWithOtherFlags(t *testing.T) {
 	}
 	if bIndex >= rIndex {
 		t.Error("Expected -b flag to appear before -R flag in command")
+	}
+}
+
+// TestForLatencyTest tests the latency test mode
+func TestForLatencyTest(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder(true)
+
+	// Test chaining
+	result := builder.ForLatencyTest(true)
+	if result != builder {
+		t.Error("ForLatencyTest should return the same builder instance for chaining")
+	}
+
+	// Test latencyTest field is set
+	if !builder.latencyTest {
+		t.Error("latencyTest field should be true")
+	}
+
+	// Test disabling latency test
+	builder.ForLatencyTest(false)
+	if builder.latencyTest {
+		t.Error("latencyTest field should be false")
+	}
+}
+
+// TestLatencyTestCommand tests ib_write_lat command generation
+func TestLatencyTestCommand(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder(true)
+	builder.Host("test-host").
+		Device("mlx5_0").
+		Port(20000).
+		ForLatencyTest(true).
+		RunInfinitely(false).
+		DurationSeconds(5)
+
+	cmd := builder.String()
+
+	// Should use ib_write_lat instead of ib_write_bw
+	if !strings.Contains(cmd, "ib_write_lat") {
+		t.Error("Command should contain 'ib_write_lat'")
+	}
+	if strings.Contains(cmd, "ib_write_bw") {
+		t.Error("Command should not contain 'ib_write_bw'")
+	}
+
+	// Should contain duration
+	if !strings.Contains(cmd, " -D 5") {
+		t.Error("Command should contain -D 5 for duration")
+	}
+
+	// Should NOT contain queue pair or message size parameters
+	if strings.Contains(cmd, " -q ") {
+		t.Error("Latency command should not contain -q flag")
+	}
+	if strings.Contains(cmd, " -m ") {
+		t.Error("Latency command should not contain -m flag")
+	}
+}
+
+// TestLatencyTestWithReport tests latency test with JSON report output
+func TestLatencyTestWithReport(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder(true)
+	builder.Host("test-host").
+		Device("mlx5_0").
+		Port(20000).
+		ForLatencyTest(true).
+		RunInfinitely(false).
+		DurationSeconds(5).
+		Report(true).
+		OutputFileName("latency_report.json")
+
+	cmd := builder.String()
+
+	// Should contain --out_json (same as bandwidth tests)
+	if !strings.Contains(cmd, "--out_json") {
+		t.Error("Latency command should contain '--out_json'")
+	}
+
+	// Should contain output file
+	if !strings.Contains(cmd, "--out_json_file latency_report.json") {
+		t.Error("Latency command should contain '--out_json_file latency_report.json'")
+	}
+
+	// Should NOT contain --report_gbits (bandwidth-specific)
+	if strings.Contains(cmd, "--report_gbits") {
+		t.Error("Latency command should not contain '--report_gbits'")
+	}
+
+	// Should NOT contain --output-format (incorrect parameter)
+	if strings.Contains(cmd, "--output-format") {
+		t.Error("Latency command should not contain '--output-format'")
+	}
+}
+
+// TestLatencyTestServerCommand tests latency server command
+func TestLatencyTestServerCommand(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder(true)
+	builder.Host("server-host").
+		Device("mlx5_0").
+		Port(20000).
+		ForLatencyTest(true).
+		RunInfinitely(false).
+		DurationSeconds(5).
+		ServerCommand()
+
+	cmd := builder.String()
+
+	// Should use ib_write_lat
+	if !strings.Contains(cmd, "ib_write_lat") {
+		t.Error("Command should contain 'ib_write_lat'")
+	}
+
+	// Should not contain target IP (server mode)
+	if strings.Contains(cmd, "192.168") {
+		t.Error("Server command should not contain target IP")
+	}
+}
+
+// TestLatencyTestClientCommand tests latency client command
+func TestLatencyTestClientCommand(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder(true)
+	builder.Host("client-host").
+		Device("mlx5_0").
+		Port(20000).
+		ForLatencyTest(true).
+		RunInfinitely(false).
+		DurationSeconds(5).
+		TargetIP("192.168.1.100").
+		ClientCommand()
+
+	cmd := builder.String()
+
+	// Should use ib_write_lat
+	if !strings.Contains(cmd, "ib_write_lat") {
+		t.Error("Command should contain 'ib_write_lat'")
+	}
+
+	// Should contain target IP (client mode)
+	if !strings.Contains(cmd, "192.168.1.100") {
+		t.Error("Client command should contain target IP")
+	}
+
+	// Should have appropriate sleep time for client
+	if !strings.Contains(cmd, "sleep 0.06") {
+		t.Error("Client command should have sleep 0.06")
+	}
+}
+
+// TestLatencyTestWithSSHKey tests latency command with SSH private key
+func TestLatencyTestWithSSHKey(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder(true)
+	builder.Host("test-host").
+		Device("mlx5_0").
+		Port(20000).
+		ForLatencyTest(true).
+		RunInfinitely(false).
+		DurationSeconds(5).
+		SSHPrivateKey("/path/to/key.pem")
+
+	cmd := builder.String()
+
+	// Should contain SSH with private key
+	if !strings.Contains(cmd, "ssh -i /path/to/key.pem test-host") {
+		t.Error("Command should contain 'ssh -i /path/to/key.pem test-host'")
+	}
+
+	// Should contain ib_write_lat
+	if !strings.Contains(cmd, "ib_write_lat") {
+		t.Error("Command should contain 'ib_write_lat'")
+	}
+}
+
+// TestLatencyTestWithGidIndex tests latency command with GID index
+func TestLatencyTestWithGidIndex(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder(true)
+	builder.Host("test-host").
+		Device("mlx5_0").
+		Port(20000).
+		ForLatencyTest(true).
+		RunInfinitely(false).
+		DurationSeconds(5).
+		GidIndex(3)
+
+	cmd := builder.String()
+
+	// Should contain GID index
+	if !strings.Contains(cmd, " -x 3") {
+		t.Error("Command should contain ' -x 3' for GID index")
+	}
+
+	// Should use ib_write_lat
+	if !strings.Contains(cmd, "ib_write_lat") {
+		t.Error("Command should contain 'ib_write_lat'")
+	}
+}
+
+// TestBandwidthTestStillWorks tests that bandwidth tests still work after adding latency support
+func TestBandwidthTestStillWorks(t *testing.T) {
+	builder := NewIBWriteBWCommandBuilder(true)
+	builder.Host("test-host").
+		Device("mlx5_0").
+		Port(20000).
+		RunInfinitely(false).
+		DurationSeconds(20).
+		QueuePairNum(10).
+		MessageSize(4096).
+		Report(true).
+		OutputFileName("bandwidth_report.json")
+
+	cmd := builder.String()
+
+	// Should use ib_write_bw
+	if !strings.Contains(cmd, "ib_write_bw") {
+		t.Error("Bandwidth command should contain 'ib_write_bw'")
+	}
+
+	// Should contain queue pair and message size
+	if !strings.Contains(cmd, " -q 10") {
+		t.Error("Bandwidth command should contain ' -q 10'")
+	}
+	if !strings.Contains(cmd, " -m 4096") {
+		t.Error("Bandwidth command should contain ' -m 4096'")
+	}
+
+	// Should contain bandwidth-specific report flags
+	if !strings.Contains(cmd, "--report_gbits") {
+		t.Error("Bandwidth command should contain '--report_gbits'")
 	}
 }

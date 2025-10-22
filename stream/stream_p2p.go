@@ -107,7 +107,7 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 	clientScriptFileName := fmt.Sprintf("%s/%s_%s_client_p2p.sh", cfg.OutputDir(), clientHost, clientHca)
 
 	// Generate server command (listener)
-	serverCmd := NewIBWriteBWCommandBuilder().
+	serverCmd := NewIBWriteBWCommandBuilder(true).
 		Host(serverHost).
 		Device(serverHca).
 		QueuePairNum(cfg.QpNum).
@@ -124,7 +124,7 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 		ServerCommand()
 
 	// Generate client command (initiator)
-	clientCmd := NewIBWriteBWCommandBuilder().
+	clientCmd := NewIBWriteBWCommandBuilder(true).
 		Host(clientHost).
 		Device(clientHca).
 		QueuePairNum(cfg.QpNum).
