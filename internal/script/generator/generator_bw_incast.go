@@ -7,20 +7,17 @@ import (
 )
 
 type bwIncastScriptGenerator struct {
-	cfg       *config.Config
-	serverIPs map[string]string // Optional: for testing, bypasses SSH lookup
+	*ScriptGenerator
+	cfg     *config.Config
+	hostIPs map[string]string
 }
 
-func NewBwIncastScriptGenerator(cfg *config.Config) *bwIncastScriptGenerator {
+func NewBwIncastScriptGenerator(cfg *config.Config, hostIPs map[string]string) *bwIncastScriptGenerator {
 	return &bwIncastScriptGenerator{
-		cfg: cfg,
+		ScriptGenerator: new(ScriptGenerator),
+		cfg:             cfg,
+		hostIPs:         hostIPs,
 	}
-}
-
-// WithServerIPs allows injecting server IPs for testing (bypasses SSH lookup)
-func (g *bwIncastScriptGenerator) WithServerIPs(ips map[string]string) *bwIncastScriptGenerator {
-	g.serverIPs = ips
-	return g
 }
 
 func (g *bwIncastScriptGenerator) GenerateScripts() (*ScriptResult, error) {
@@ -28,18 +25,6 @@ func (g *bwIncastScriptGenerator) GenerateScripts() (*ScriptResult, error) {
 	// Check port availability
 	if err := g.CheckPortsAvailability(); err != nil {
 		return nil, err
-	}
-
-	// Get server IPs
-	var serverIps map[string]string
-	var err error
-	if g.serverIPs != nil {
-		serverIps = g.serverIPs
-	} else {
-		serverIps, err = g.cfg.LookupServerHostsIP()
-		if err != nil {
-			return nil, fmt.Errorf("failed to lookup server IPs: %v", err)
-		}
 	}
 
 	// group scripts by host
@@ -70,7 +55,7 @@ func (g *bwIncastScriptGenerator) GenerateScripts() (*ScriptResult, error) {
 						QueuePairs(g.cfg.QpNum).
 						MessageSize(g.cfg.MessageSizeBytes).
 						Port(port).
-						TargetIP(serverIps[sHost]).
+						TargetIP(g.hostIPs[sHost]).
 						RunInfinitely(g.cfg.Run.Infinitely).
 						Duration(g.cfg.Run.DurationSeconds).
 						RdmaCm(g.cfg.RdmaCm).

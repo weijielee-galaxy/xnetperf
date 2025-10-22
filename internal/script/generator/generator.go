@@ -1,34 +1,65 @@
 package generator
 
-import "strings"
+import (
+	"xnetperf/config"
+	"xnetperf/internal/tools"
+)
 
 const delimiter = " && \\ \n"
 
 type ScriptGeneratorIface interface {
 	GenerateScripts() (*ScriptResult, error)
+
+	// helper methods can be added here
+	buildIbWriteBwCommand(device, port, targetIP string, cfg *config.ClientConfig) string
+	buildIbWriteLatCommand(device, port, targetIP string, cfg *config.ClientConfig) string
 }
 
-type ScriptResult struct {
-	ServerScripts []*HostScript
-	ClientScripts []*HostScript
+type ScriptGenerator struct {
 }
 
-func BuildHostScriptsFromCmdMap(hostCmds map[string][]string) []*HostScript {
-	hs := []*HostScript{}
-	for host, cmds := range hostCmds {
-		cCmds := []string{}
-		for _, cmd := range cmds {
-			cCmds = append(cCmds, "( "+cmd+" )")
-		}
-		hs = append(hs, &HostScript{
-			Host:    host,
-			Command: strings.Join(cCmds, delimiter),
-		})
+func (sg *ScriptGenerator) GenerateScripts() (*ScriptResult, error) {
+	return nil, nil
+}
+
+func (sg *ScriptGenerator) buildIbWriteBwCommand(cfg *config.Config, hca string, port int, targetIP string, rFileName string) string {
+	cmd := tools.NewIBWriteBwCommand().
+		Device(hca).
+		QueuePairs(cfg.QpNum).
+		MessageSize(cfg.MessageSizeBytes).
+		Port(port).
+		RunInfinitely(cfg.Run.Infinitely).
+		Duration(cfg.Run.DurationSeconds).
+		RdmaCm(cfg.RdmaCm).
+		GidIndex(cfg.GidIndex)
+	if cfg.Report.Enable {
+		cmd = cmd.EnableReport(rFileName)
 	}
-	return hs
+	if targetIP != "" {
+		cmd = cmd.AsClient(targetIP)
+	} else {
+		cmd = cmd.AsServer()
+	}
+	return cmd.String()
 }
 
-type HostScript struct {
-	Host    string
-	Command string
+func (sg *ScriptGenerator) buildIbWriteLatCommand(cfg *config.Config, hca string, port int, targetIP string, rFileName string) string {
+	cmd := tools.NewIBWriteLatCommand().
+		Device(hca).
+		Port(port).
+		RunInfinitely(false).
+		Duration(5).
+		RdmaCm(cfg.RdmaCm).
+		GidIndex(cfg.GidIndex)
+
+	if targetIP != "" {
+		cmd = cmd.AsClient(targetIP)
+	} else {
+		cmd = cmd.AsServer()
+	}
+
+	if cfg.Report.Enable {
+		cmd = cmd.EnableReport(rFileName)
+	}
+	return cmd.String()
 }

@@ -213,7 +213,7 @@ func TestBwIncastScriptGenerator_GenerateScripts(t *testing.T) {
 			wantErr:     true,
 			errContains: "not enough available ports",
 		},
-        }
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock IPs for all server hosts
@@ -221,8 +221,8 @@ func TestBwIncastScriptGenerator_GenerateScripts(t *testing.T) {
 			for i, host := range tt.cfg.Server.Hostname {
 				mockIPs[host] = fmt.Sprintf("192.168.1.%d", 10+i)
 			}
-			
-			gen := generator.NewBwIncastScriptGenerator(tt.cfg).WithServerIPs(mockIPs)
+
+			gen := generator.NewBwIncastScriptGenerator(tt.cfg, mockIPs)
 			result, err := gen.GenerateScripts()
 
 			if tt.wantErr {
@@ -307,7 +307,7 @@ func TestBwIncastScriptGenerator_CheckPortsAvailability(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gen := generator.NewBwIncastScriptGenerator(tt.cfg)
+			gen := generator.NewBwIncastScriptGenerator(tt.cfg, nil)
 			err := gen.CheckPortsAvailability()
 
 			if tt.wantErr {
@@ -350,7 +350,7 @@ func TestBwIncastScriptGenerator_CommandFormat(t *testing.T) {
 	}
 
 	mockIPs := map[string]string{"server1": "192.168.1.10"}
-	gen := generator.NewBwIncastScriptGenerator(cfg).WithServerIPs(mockIPs)
+	gen := generator.NewBwIncastScriptGenerator(cfg, mockIPs)
 	result, err := gen.GenerateScripts()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)

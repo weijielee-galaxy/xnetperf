@@ -268,7 +268,7 @@ func TestBwFullmeshScriptGenerator_GenerateScripts(t *testing.T) {
 				mockIPs[host] = fmt.Sprintf("192.168.1.%d", 10+i)
 			}
 
-			gen := generator.NewBwFullmeshScriptGenerator(tt.cfg).WithHostIPs(mockIPs)
+			gen := generator.NewBwFullmeshScriptGenerator(tt.cfg, mockIPs)
 			result, err := gen.GenerateScripts()
 
 			if tt.wantErr {
@@ -368,7 +368,7 @@ func TestBwFullmeshScriptGenerator_CheckPortsAvailability(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gen := generator.NewBwFullmeshScriptGenerator(tt.cfg)
+			gen := generator.NewBwFullmeshScriptGenerator(tt.cfg, nil)
 			err := gen.CheckPortsAvailability()
 
 			if tt.wantErr {
@@ -411,7 +411,7 @@ func TestBwFullmeshScriptGenerator_CommandFormat(t *testing.T) {
 	}
 
 	mockIPs := map[string]string{"host1": "192.168.1.10", "host2": "192.168.1.11"}
-	gen := generator.NewBwFullmeshScriptGenerator(cfg).WithHostIPs(mockIPs)
+	gen := generator.NewBwFullmeshScriptGenerator(cfg, mockIPs)
 	result, err := gen.GenerateScripts()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -462,7 +462,7 @@ func TestBwFullmeshScriptGenerator_PortAllocation(t *testing.T) {
 	}
 
 	mockIPs := map[string]string{"host1": "192.168.1.10", "host2": "192.168.1.11"}
-	gen := generator.NewBwFullmeshScriptGenerator(cfg).WithHostIPs(mockIPs)
+	gen := generator.NewBwFullmeshScriptGenerator(cfg, mockIPs)
 	result, err := gen.GenerateScripts()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
