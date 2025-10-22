@@ -1,9 +1,15 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
+	"sync"
+	"xnetperf/internal/tools"
 
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 )
 
@@ -193,4 +199,96 @@ func EnsureConfigFile(filePath string) error {
 		fmt.Printf("Created default config file: %s\n", filePath)
 	}
 	return nil
+}
+
+// LookupClientHostsIP retrieves the IP addresses of all client hosts
+func (cfg *Config) LookupClientHostsIP() (map[string]string, error) {
+	ipMap := make(map[string]string)
+	mu := sync.Mutex{}
+
+	g, _ := errgroup.WithContext(context.Background())
+
+	for _, host := range cfg.Client.Hostname {
+		host := host // capture loop variable
+		g.Go(func() error {
+			// Check if host is already an IP address
+			if tools.IsValidIP(host) {
+				mu.Lock()
+				ipMap[host] = host
+				mu.Unlock()
+				return nil
+			}
+
+			ip, err := cfg.getHostIP(host)
+			if err != nil {
+				return err
+			}
+			mu.Lock()
+			ipMap[host] = ip
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	return ipMap, nil
+}
+
+// LookupServerHostsIP retrieves the IP addresses of all server hosts
+func (cfg *Config) LookupServerHostsIP() (map[string]string, error) {
+	ipMap := make(map[string]string)
+	mu := sync.Mutex{}
+
+	g, _ := errgroup.WithContext(context.Background())
+
+	for _, host := range cfg.Server.Hostname {
+		host := host // capture loop variable
+		g.Go(func() error {
+			// Check if host is already an IP address
+			if tools.IsValidIP(host) {
+				mu.Lock()
+				ipMap[host] = host
+				mu.Unlock()
+				return nil
+			}
+
+			ip, err := cfg.getHostIP(host)
+			if err != nil {
+				return err
+			}
+			mu.Lock()
+			ipMap[host] = ip
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	return ipMap, nil
+}
+
+// getHostIP retrieves the IP address of a host using specified network interface
+func (cfg *Config) getHostIP(hostname string) (string, error) {
+	command := fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1", cfg.NetworkInterface)
+
+	sshWrapper := tools.NewSSHWrapper(hostname).PrivateKey(cfg.SSH.PrivateKey).Command(command)
+	cmd := exec.Command(sshWrapper.String())
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("SSH command failed on %s: %v, output: %s", hostname, err, string(output))
+	}
+
+	ip := strings.TrimSpace(string(output))
+	if ip == "" {
+		return "", fmt.Errorf("no IP address found for %s on %s interface", hostname, cfg.NetworkInterface)
+	}
+
+	return ip, nil
 }
