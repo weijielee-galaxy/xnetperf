@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"xnetperf/config"
+	"xnetperf/internal/script"
 
 	"github.com/spf13/cobra"
 )
@@ -28,23 +29,7 @@ Examples:
 
   # Execute with custom config file
   xnetperf execute -c /path/to/config.yaml`,
-	Run: doRunExecute,
-}
-
-func doRunExecute(cmd *cobra.Command, args []string) {
-	cfg, err := config.LoadConfig(cfgFile)
-	if err != nil {
-		fmt.Printf("❌ Error loading config: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println(cfgFile)
-	fmt.Println(cfg.Version, cfg.Version == "v1")
-
-	if cfg.Version == "v1" {
-		runExecuteV1(cmd, args)
-	} else {
-		runExecute(cmd, args)
-	}
+	Run: runExecute,
 }
 
 func runExecute(cmd *cobra.Command, args []string) {
@@ -101,7 +86,29 @@ func runExecute(cmd *cobra.Command, args []string) {
 func executeRunStep(cfg *config.Config) bool {
 	fmt.Printf("Executing network tests (stream_type: %s)...\n", cfg.StreamType)
 
-	execRunCommand(cfg)
+	if cfg.Version == "v1" {
+		// executor 里面没有precheck 先添加在这里
+		fmt.Println("\n🔍 Step 0/5: Performing network card precheck...")
+		if !execPrecheckCommand(cfg) {
+			fmt.Printf("❌ Precheck failed! Network cards are not ready. Please fix the issues before running latency tests.\n")
+			os.Exit(1)
+		}
+		fmt.Println("✅ Precheck passed! All network cards are healthy. Proceeding with latency tests...")
+
+		executor := script.NewExecutor(cfg, script.TestTypeBandwidth)
+		if executor == nil {
+			fmt.Println("❌ Unsupported stream type for v1 execute workflow. Aborting.")
+			os.Exit(1)
+		}
+		fmt.Println("\n📋 Step 1/4: Running network tests...")
+		err := executor.Execute()
+		if err != nil {
+			fmt.Printf("❌ Run step failed: %v. Aborting workflow.\n", err)
+			os.Exit(1)
+		}
+	} else {
+		execRunCommand(cfg)
+	}
 
 	fmt.Println("✅ Network tests started successfully")
 	return true

@@ -31,7 +31,8 @@ func NewIBWriteBwCommand() *IBCommand {
 		commandType:    IBWriteBw,
 		runInfinitely:  false,
 		redirectOutput: ">/dev/null 2>&1",
-		background:     true,
+		// redirectOutput: ">>/root/20000.log 2>&1",
+		background: true,
 	}
 }
 

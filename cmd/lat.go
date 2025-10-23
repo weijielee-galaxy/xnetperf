@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"xnetperf/config"
+	"xnetperf/internal/script"
 	"xnetperf/stream"
 
 	"github.com/spf13/cobra"
@@ -72,18 +73,32 @@ func runLat(cmd *cobra.Command, args []string) {
 	}
 	fmt.Println("✅ Precheck passed! All network cards are healthy. Proceeding with latency tests...")
 
-	// Step 1: Generate latency scripts
-	fmt.Println("\n📋 Step 1/5: Generating latency test scripts...")
-	if !executeLatencyGenerateStep(cfg) {
-		fmt.Println("❌ Script generation failed. Aborting workflow.")
-		os.Exit(1)
-	}
+	if cfg.Version == "v1" {
+		executor := script.NewExecutor(cfg, script.TestTypeLatency)
+		if executor == nil {
+			fmt.Println("❌ Unsupported stream type for v1 execute workflow. Aborting.")
+			os.Exit(1)
+		}
+		fmt.Println("\n📋 Step 1/5: Running network tests...")
+		err := executor.Execute()
+		if err != nil {
+			fmt.Printf("❌ Run step failed: %v. Aborting workflow.\n", err)
+			os.Exit(1)
+		}
+	} else {
+		// Step 1: Generate latency scripts
+		fmt.Println("\n📋 Step 1/5: Generating latency test scripts...")
+		if !executeLatencyGenerateStep(cfg) {
+			fmt.Println("❌ Script generation failed. Aborting workflow.")
+			os.Exit(1)
+		}
 
-	// Step 2: Run latency tests
-	fmt.Println("\n▶️  Step 2/5: Running latency tests...")
-	if !executeLatencyRunStep(cfg) {
-		fmt.Println("❌ Latency test execution failed. Aborting workflow.")
-		os.Exit(1)
+		// Step 2: Run latency tests
+		fmt.Println("\n▶️  Step 2/5: Running latency tests...")
+		if !executeLatencyRunStep(cfg) {
+			fmt.Println("❌ Latency test execution failed. Aborting workflow.")
+			os.Exit(1)
+		}
 	}
 
 	// Step 3: Monitor progress
@@ -624,8 +639,8 @@ func displayLatencyMatrix(latencyData []LatencyData) {
 							// Self-to-self: display "-" without red color
 							fmt.Printf(" %*s │", valueColWidth, "-")
 						} else {
-							// Missing data: display red "*" to indicate test failure/unreachable
-							fmt.Printf(" %s%*s%s │", colorRed, valueColWidth, "*", colorReset)
+							// Missing data: display red "∞" to indicate test failure/unreachable
+							fmt.Printf(" %s%*s%s │", colorRed, valueColWidth, "∞", colorReset)
 						}
 					}
 				}
@@ -1118,8 +1133,8 @@ func displayLatencyMatrixIncast(latencyData []LatencyData, cfg *config.Config) {
 						}
 					} else {
 						// In incast mode, client and server are separate, so missing data is always a failure
-						// Display red "*" to indicate test failure/unreachable
-						fmt.Printf(" %s%*s%s │", colorRed, valueColWidth, "*", colorReset)
+						// Display red "∞" to indicate test failure/unreachable
+						fmt.Printf(" %s%*s%s │", colorRed, valueColWidth, "∞", colorReset)
 					}
 				}
 			}
