@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"xnetperf/config"
+	"xnetperf/internal/script"
 	"xnetperf/stream"
 )
 
@@ -43,6 +44,38 @@ func ExecuteRun(cfg *config.Config) (*RunResult, error) {
 
 	// 分发并运行脚本
 	stream.DistributeAndRunScripts(cfg)
+
+	result.Success = true
+	result.Message = "Test scripts distributed and started successfully"
+	return result, nil
+}
+
+// ExecuteRun 执行流量测试（不包含 precheck）
+func ExecuteRunV1(cfg *config.Config) (*RunResult, error) {
+	result := &RunResult{}
+
+	// 在运行测试前清理远程主机上的旧JSON报告文件
+	if cfg.Report.Enable {
+		if err := cleanupRemoteReportFiles(cfg); err != nil {
+			result.Success = false
+			result.Error = fmt.Sprintf("Failed to cleanup remote files: %v", err)
+			return result, err
+		}
+	}
+
+	executor := script.NewExecutor(cfg, script.TestTypeBandwidth)
+	if executor == nil {
+		result.Success = false
+		result.Error = "Unsupported stream type for v1 execute workflow"
+		return result, fmt.Errorf("unsupported stream type for v1 execute workflow")
+	}
+
+	err := executor.Execute()
+	if err != nil {
+		result.Success = false
+		result.Error = fmt.Sprintf("Failed to execute scripts: %v", err)
+		return result, err
+	}
 
 	result.Success = true
 	result.Message = "Test scripts distributed and started successfully"

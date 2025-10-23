@@ -442,7 +442,7 @@ func (s *ConfigService) RunTest(c *gin.Context) {
 	}
 
 	// 执行测试
-	result, err := workflow.ExecuteRun(cfg)
+	result, err := workflow.ExecuteRunV1(cfg)
 	if err != nil {
 		c.JSON(500, Error(500, fmt.Sprintf("测试运行失败: %v", err)))
 		return
