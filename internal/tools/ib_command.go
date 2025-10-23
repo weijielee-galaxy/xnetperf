@@ -13,6 +13,8 @@ type IBCommand struct {
 	durationSec    int
 	queuePairNum   int // Only used for bandwidth tests
 	messageSize    int // Only used for bandwidth tests
+	redirectOutput string
+	background     bool
 	port           int
 	targetIP       string
 	bidirectional  bool
@@ -26,16 +28,20 @@ type IBCommand struct {
 // Default: not running infinitely (user should explicitly set RunInfinitely or Duration)
 func NewIBWriteBwCommand() *IBCommand {
 	return &IBCommand{
-		commandType:   IBWriteBw,
-		runInfinitely: false,
+		commandType:    IBWriteBw,
+		runInfinitely:  false,
+		redirectOutput: ">/dev/null 2>&1",
+		background:     true,
 	}
 }
 
 // NewIBWriteLatCommand creates a new ib_write_lat command builder
 func NewIBWriteLatCommand() *IBCommand {
 	return &IBCommand{
-		commandType:   IBWriteLat,
-		runInfinitely: false, // Latency tests typically run for a fixed duration
+		commandType:    IBWriteLat,
+		runInfinitely:  false, // Latency tests typically run for a fixed duration
+		redirectOutput: ">/dev/null 2>&1",
+		background:     true,
 	}
 }
 
@@ -67,6 +73,18 @@ func (c *IBCommand) QueuePairs(num int) *IBCommand {
 func (c *IBCommand) MessageSize(bytes int) *IBCommand {
 	c.messageSize = bytes
 	return c
+}
+
+// RedirectOutput sets output redirection
+func (b *IBCommand) RedirectOutput(redirect string) *IBCommand {
+	b.redirectOutput = redirect
+	return b
+}
+
+// Background sets whether to run in background
+func (b *IBCommand) Background(enable bool) *IBCommand {
+	b.background = enable
+	return b
 }
 
 // Port sets the port number for the test
@@ -187,6 +205,14 @@ func (c *IBCommand) Build() string {
 				cmd.WriteString(fmt.Sprintf(" --out_json_file %s", c.outputFileName))
 			}
 		}
+	}
+
+	if c.redirectOutput != "" {
+		cmd.WriteString(fmt.Sprintf(" %s", c.redirectOutput))
+	}
+
+	if c.background {
+		cmd.WriteString(" &")
 	}
 
 	return cmd.String()

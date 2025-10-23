@@ -15,14 +15,16 @@ func BuildHostScriptsFromCmdMap(hostCmds map[string][]string) []*HostScript {
 			cCmds = append(cCmds, "( "+cmd+" )")
 		}
 		hs = append(hs, &HostScript{
-			Host:    host,
-			Command: strings.Join(cCmds, delimiter),
+			Host:         host,
+			Command:      strings.Join(cCmds, delimiter),
+			CommandCount: len(cmds),
 		})
 	}
 	return hs
 }
 
 type HostScript struct {
-	Host    string
-	Command string
+	Host         string
+	Command      string
+	CommandCount int
 }

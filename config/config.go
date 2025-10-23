@@ -275,10 +275,13 @@ func (cfg *Config) LookupServerHostsIP() (map[string]string, error) {
 
 // getHostIP retrieves the IP address of a host using specified network interface
 func (cfg *Config) getHostIP(hostname string) (string, error) {
-	command := fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1", cfg.NetworkInterface)
+	command := fmt.Sprintf(`ip -4 addr show %s | grep -oP '(?<=inet\s)\d+(\.\d+){3}'`, cfg.NetworkInterface)
 
 	sshWrapper := tools.NewSSHWrapper(hostname).PrivateKey(cfg.SSH.PrivateKey).Command(command)
-	cmd := exec.Command(sshWrapper.String())
+
+	fmt.Println(sshWrapper.String())
+
+	cmd := exec.Command("bash", "-c", sshWrapper.String())
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

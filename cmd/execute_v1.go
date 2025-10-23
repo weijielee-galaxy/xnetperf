@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"xnetperf/config"
+	"xnetperf/internal/script"
 
 	"github.com/spf13/cobra"
 )
@@ -22,9 +23,21 @@ func runExecuteV1(cmd *cobra.Command, args []string) {
 	}
 
 	// Step 1: Execute run command
+	// fmt.Println("\n📋 Step 1/4: Running network tests...")
+	// if !executeRunStepV1(cfg) {
+	// 	fmt.Println("❌ Run step failed. Aborting workflow.")
+	// 	os.Exit(1)
+	// }
+
+	executor := script.NewExecutor(cfg, script.ModeBwIncast)
+	if executor == nil {
+		fmt.Println("❌ Unsupported stream type for v1 execute workflow. Aborting.")
+		os.Exit(1)
+	}
 	fmt.Println("\n📋 Step 1/4: Running network tests...")
-	if !executeRunStepV1(cfg) {
-		fmt.Println("❌ Run step failed. Aborting workflow.")
+	err = executor.Execute()
+	if err != nil {
+		fmt.Printf("❌ Run step failed: %v. Aborting workflow.\n", err)
 		os.Exit(1)
 	}
 

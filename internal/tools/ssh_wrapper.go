@@ -67,7 +67,7 @@ func (w *SSHWrapper) Build() string {
 	cmd.WriteString(fmt.Sprintf(" %s", w.host))
 
 	// Remote command in single quotes
-	cmd.WriteString(" '")
+	cmd.WriteString(" \"")
 	cmd.WriteString(w.command)
 
 	// Output redirection
@@ -80,7 +80,7 @@ func (w *SSHWrapper) Build() string {
 		cmd.WriteString(" &")
 	}
 
-	cmd.WriteString("'")
+	cmd.WriteString("\"")
 
 	// Sleep after command
 	if w.sleepAfter != "" {
