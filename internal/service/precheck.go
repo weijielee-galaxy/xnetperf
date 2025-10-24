@@ -1003,7 +1003,17 @@ func DisplayPrecheckResultsV1(results []PrecheckResult) {
 	// 创建表格
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.SetStyle(table.StyleRounded)
+
+	locale := os.Getenv("LANG")
+	isUTF8 := strings.Contains(strings.ToUpper(locale), "UTF-8") ||
+		strings.Contains(strings.ToUpper(locale), "UTF8")
+
+	if isUTF8 {
+		t.SetStyle(table.StyleRounded) // UTF-8 表格
+	} else {
+		t.SetStyle(table.StyleLight) // ASCII 表格
+	}
+	// t.SetStyle(table.StyleRounded)
 
 	// 设置表头
 	t.AppendHeader(table.Row{
