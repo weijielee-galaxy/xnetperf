@@ -5,6 +5,14 @@ import (
 	"strings"
 )
 
+// QuoteType represents the type of quotes to use for SSH command
+type QuoteType string
+
+const (
+	DoubleQuote QuoteType = "\""
+	SingleQuote QuoteType = "'"
+)
+
 // SSHWrapper wraps a command for remote execution via SSH
 type SSHWrapper struct {
 	host           string
@@ -13,15 +21,21 @@ type SSHWrapper struct {
 	background     bool
 	redirectOutput string
 	sleepAfter     string
+	quoteType      QuoteType
 }
 
 // NewSSHWrapper creates a new SSH command wrapper
-func NewSSHWrapper(host string) *SSHWrapper {
+func NewSSHWrapper(host string, quoteType ...QuoteType) *SSHWrapper {
+	qt := DoubleQuote // 默认使用双引号
+	if len(quoteType) > 0 {
+		qt = quoteType[0]
+	}
 	return &SSHWrapper{
 		host:           host,
 		background:     false,
 		redirectOutput: "",
 		sleepAfter:     "",
+		quoteType:      qt,
 	}
 }
 
@@ -66,8 +80,9 @@ func (w *SSHWrapper) Build() string {
 	}
 	cmd.WriteString(fmt.Sprintf(" %s", w.host))
 
-	// Remote command in single quotes
-	cmd.WriteString(" \"")
+	// Remote command with specified quote type
+	cmd.WriteString(" ")
+	cmd.WriteString(string(w.quoteType))
 	cmd.WriteString(w.command)
 
 	// Output redirection
@@ -80,7 +95,7 @@ func (w *SSHWrapper) Build() string {
 		cmd.WriteString(" &")
 	}
 
-	cmd.WriteString("\"")
+	cmd.WriteString(string(w.quoteType))
 
 	// Sleep after command
 	if w.sleepAfter != "" {

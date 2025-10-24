@@ -488,11 +488,13 @@ func execAndParseHostCommand(hostname, command, sshKeyPath string) *HostPrecheck
 	}
 
 	// 构建 SSH 命令
-	sshWrapper := tools.NewSSHWrapper(hostname).PrivateKey(sshKeyPath).Command(command)
+	sshWrapper := tools.NewSSHWrapper(hostname, "'").PrivateKey(sshKeyPath).Command(command)
+	fmt.Println(sshWrapper.String())
 	cmd := exec.Command("bash", "-c", sshWrapper.String())
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		fmt.Println(err)
 		result.Error = fmt.Sprintf("SSH execution failed: %v", err)
 		return result
 	}
@@ -504,6 +506,7 @@ func execAndParseHostCommand(hostname, command, sshKeyPath string) *HostPrecheck
 
 	err = json.Unmarshal([]byte(strings.TrimSpace(string(output))), &SerialData)
 	if err != nil {
+		fmt.Println("JSON parse error: ", err)
 		result.Error = fmt.Sprintf("Failed to parse JSON output: %v. Output: %s", err, output)
 		return result
 	}
@@ -519,65 +522,6 @@ func execAndParseHostCommand(hostname, command, sshKeyPath string) *HostPrecheck
 
 	return result
 }
-
-// func execPrecheckCommand(cfg *config.Config) bool {
-
-// 	// 显示结果
-// 	displayPrecheckResults(results)
-
-// 	// 检查是否所有HCA都健康
-// 	allHealthy := true
-// 	for _, result := range results {
-// 		if !result.IsHealthy {
-// 			allHealthy = false
-// 			break
-// 		}
-// 	}
-
-// 	// v0.0.3: 检查所有 speed 是否相同
-// 	allSpeedsSame := true
-// 	if len(results) > 1 {
-// 		firstSpeed := ""
-// 		for _, result := range results {
-// 			if result.Error == "" && result.Speed != "" {
-// 				if firstSpeed == "" {
-// 					firstSpeed = result.Speed
-// 				} else if result.Speed != firstSpeed {
-// 					allSpeedsSame = false
-// 					break
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	return allHealthy && allSpeedsSame
-// }
-
-// func buildSSHCommand(hostname, remoteCmd, sshKeyPath string) *exec.Cmd {
-// 	if sshKeyPath != "" {
-// 		return exec.Command("ssh", "-i", sshKeyPath, hostname, remoteCmd)
-// 	}
-// 	return exec.Command("ssh", hostname, remoteCmd)
-// }
-
-// func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
-
-// 	// 去掉状态前面的数字和冒号，只保留有意义的文本
-// 	result.PhysState = cleanStateString(physStateStr)
-// 	result.State = cleanStateString(stateStr)
-// 	result.Speed = speedStr // 保持速度信息的原始格式
-// 	result.FwVer = fwVerStr
-// 	result.BoardId = boardIdStr
-// 	result.SerialNumber = serialNumberStr
-
-// 	// 判断是否健康：需要同时满足 LinkUp 和 ACTIVE
-// 	isLinkUp := strings.Contains(physStateStr, "LinkUp")
-// 	isActive := strings.Contains(stateStr, "ACTIVE")
-
-// 	result.IsHealthy = isLinkUp && isActive
-
-// 	return result
-// }
 
 // cleanStateString 去掉状态字符串前面的数字和冒号，只保留有意义的文本
 // 例如: "5: LinkUp" -> "LinkUp", "4: ACTIVE" -> "ACTIVE"
