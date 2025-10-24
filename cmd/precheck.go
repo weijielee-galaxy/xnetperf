@@ -72,19 +72,7 @@ func runPrecheck(cmd *cobra.Command, args []string) {
 
 	if cfg.Version == "v1" {
 		precheckResult := service.Precheck(cfg)
-
-		// 检查是否需要使用新版本展示（通过环境变量控制）
-		uiVersion := os.Getenv("PRECHECK_UI")
-		switch uiVersion {
-		case "v1":
-			fmt.Println("使用 V1 版本表格展示 (go-pretty/table - 基础版)...")
-			service.DisplayPrecheckResultsV1(precheckResult)
-		case "v2":
-			fmt.Println("使用 V2 版本表格展示 (优雅分层 - 推荐)...")
-			service.DisplayPrecheckResultsV2(precheckResult)
-		default:
-			service.DisplayPrecheckResults(precheckResult)
-		}
+		service.DisplayPrecheckResultsV2(precheckResult)
 		os.Exit(0)
 	}
 
