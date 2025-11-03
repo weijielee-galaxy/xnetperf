@@ -23,7 +23,7 @@ func GenerateIncastScripts(cfg *config.Config) {
 	port := cfg.StartPort
 	for _, sHost := range cfg.Server.Hostname {
 		// 3. Run the command and capture the combined output (stdout and stderr).
-		hostIP, err := getHostIP(sHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
+		hostIP, err := getHostIP(sHost, cfg.SSH.PrivateKey, cfg.SSH.User, cfg.NetworkInterface)
 		if err != nil {
 			// If command fails, return the output for debugging and a detailed error.
 			fmt.Printf("Error executing command on %s: %v\nOutput: %s\n", sHost, err, string(hostIP))

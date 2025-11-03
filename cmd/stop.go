@@ -39,7 +39,7 @@ func handleStopCommand(cfg *config.Config) {
 			defer wg.Done()
 
 			fmt.Printf("-> Contacting %s...\n", h)
-			cmd := tools.BuildSSHCommand(h, commandToStop, cfg.SSH.PrivateKey)
+			cmd := tools.BuildSSHCommand(h, commandToStop, cfg.SSH.PrivateKey, cfg.SSH.User)
 			output, err := cmd.CombinedOutput()
 
 			if err != nil {

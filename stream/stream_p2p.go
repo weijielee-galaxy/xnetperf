@@ -60,14 +60,14 @@ func GenerateP2PScripts(cfg *config.Config) error {
 		clientHost := cfg.Client.Hostname[hostIndex]
 
 		// Get server IP
-		serverIP, err := getHostIP(serverHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
+		serverIP, err := getHostIP(serverHost, cfg.SSH.PrivateKey, cfg.SSH.User, cfg.NetworkInterface)
 		if err != nil {
 			fmt.Printf("❌ Error getting IP for server %s: %v\n", serverHost, err)
 			// continue
 		}
 
 		// Get client IP
-		clientIP, err := getHostIP(clientHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
+		clientIP, err := getHostIP(clientHost, cfg.SSH.PrivateKey, cfg.SSH.User, cfg.NetworkInterface)
 		if err != nil {
 			fmt.Printf("❌ Error getting IP for client %s: %v\n", clientHost, err)
 			// continue
@@ -158,9 +158,9 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 }
 
 // getHostIP retrieves the IP address of a host using specified network interface
-func getHostIP(hostname string, sshKeyPath string, networkInterface string) (string, error) {
+func getHostIP(hostname string, sshKeyPath, user string, networkInterface string) (string, error) {
 	command := fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1", networkInterface)
-	cmd := tools.BuildSSHCommand(hostname, command, sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, command, sshKeyPath, user)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

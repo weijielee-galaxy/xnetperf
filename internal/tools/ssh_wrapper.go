@@ -16,6 +16,7 @@ const (
 // SSHWrapper wraps a command for remote execution via SSH
 type SSHWrapper struct {
 	host           string
+	user           string // SSH username (optional, e.g., "root")
 	privateKeyPath string
 	command        string
 	background     bool
@@ -42,6 +43,12 @@ func NewSSHWrapper(host string, quoteType ...QuoteType) *SSHWrapper {
 			"-o LogLevel=ERROR",           // 只输出错误日志，抑制 Warning
 		},
 	}
+}
+
+// User sets the SSH username for remote host (e.g., "root")
+func (w *SSHWrapper) User(username string) *SSHWrapper {
+	w.user = username
+	return w
 }
 
 // PrivateKey sets the SSH private key path for authentication
@@ -101,7 +108,13 @@ func (w *SSHWrapper) Build() string {
 	if w.privateKeyPath != "" {
 		cmd.WriteString(fmt.Sprintf(" -i %s", w.privateKeyPath))
 	}
-	cmd.WriteString(fmt.Sprintf(" %s", w.host))
+
+	// Construct host (user@host or just host)
+	host := w.host
+	if w.user != "" {
+		host = fmt.Sprintf("%s@%s", w.user, w.host)
+	}
+	cmd.WriteString(fmt.Sprintf(" %s", host))
 
 	// Remote command with specified quote type
 	cmd.WriteString(" ")

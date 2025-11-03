@@ -72,7 +72,7 @@ func Execute(cfg *config.Config) (*PrecheckSummary, error) {
 	}
 
 	// 并发执行检查
-	results := checkAllHCAs(checkItems, cfg.SSH.PrivateKey)
+	results := checkAllHCAs(checkItems, cfg.SSH.PrivateKey, cfg.SSH.User)
 
 	// 按 hostname 然后按 HCA 排序
 	sort.Slice(results, func(i, j int) bool {
@@ -132,7 +132,7 @@ func Execute(cfg *config.Config) (*PrecheckSummary, error) {
 func checkAllHCAs(checkItems []struct {
 	hostname string
 	hca      string
-}, sshKeyPath string) []PrecheckResult {
+}, sshKeyPath, user string) []PrecheckResult {
 	var results []PrecheckResult
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -148,7 +148,7 @@ func checkAllHCAs(checkItems []struct {
 			}
 
 			// 检查物理状态
-			physState, err := getHCAInfo(hostname, hca, "phys_state", sshKeyPath)
+			physState, err := getHCAInfo(hostname, hca, "phys_state", sshKeyPath, user)
 			if err != nil {
 				result.Error = fmt.Sprintf("Failed to get phys_state: %v", err)
 				fmt.Printf("Error: %s/%s - %s\n", hostname, hca, result.Error)
@@ -160,7 +160,7 @@ func checkAllHCAs(checkItems []struct {
 			result.PhysState = strings.TrimSpace(cleanStateString(physState))
 
 			// 检查逻辑状态
-			state, err := getHCAInfo(hostname, hca, "state", sshKeyPath)
+			state, err := getHCAInfo(hostname, hca, "state", sshKeyPath, user)
 			if err != nil {
 				result.Error = fmt.Sprintf("Failed to get state: %v", err)
 				fmt.Printf("Error: %s/%s - %s\n", hostname, hca, result.Error)
@@ -172,7 +172,7 @@ func checkAllHCAs(checkItems []struct {
 			result.State = strings.TrimSpace(cleanStateString(state))
 
 			// v0.0.2: 检查 speed
-			speed, err := getHCAInfo(hostname, hca, "rate", sshKeyPath)
+			speed, err := getHCAInfo(hostname, hca, "rate", sshKeyPath, user)
 			if err != nil {
 				result.Error = fmt.Sprintf("Failed to get rate: %v", err)
 				fmt.Printf("Error: %s/%s - %s\n", hostname, hca, result.Error)
@@ -184,7 +184,7 @@ func checkAllHCAs(checkItems []struct {
 			result.Speed = strings.TrimSpace(speed)
 
 			// v0.0.3: 检查 FW Version（直接在 HCA 根目录）
-			fwVer, err := getHCAInfoRoot(hostname, hca, "fw_ver", sshKeyPath)
+			fwVer, err := getHCAInfoRoot(hostname, hca, "fw_ver", sshKeyPath, user)
 			if err != nil {
 				// 不中断，只记录警告
 				result.FwVer = "N/A"
@@ -194,7 +194,7 @@ func checkAllHCAs(checkItems []struct {
 			}
 
 			// v0.0.3: 检查 Board ID（直接在 HCA 根目录）
-			boardId, err := getHCAInfoRoot(hostname, hca, "board_id", sshKeyPath)
+			boardId, err := getHCAInfoRoot(hostname, hca, "board_id", sshKeyPath, user)
 			if err != nil {
 				// 不中断，只记录警告
 				result.BoardId = "N/A"
@@ -231,9 +231,9 @@ func cleanStateString(stateStr string) string {
 	return strings.TrimSpace(stateStr[colonIndex+1:])
 }
 
-func getHCAInfo(hostname, hca, infoType string, sshKeyPath string) (string, error) {
+func getHCAInfo(hostname, hca, infoType string, sshKeyPath, user string) (string, error) {
 	path := fmt.Sprintf("/sys/class/infiniband/%s/ports/1/%s", hca, infoType)
-	cmd := tools.BuildSSHCommand(hostname, fmt.Sprintf("cat %s", path), sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, fmt.Sprintf("cat %s", path), sshKeyPath, user)
 
 	// 设置超时
 	timer := time.AfterFunc(10*time.Second, func() {
@@ -250,9 +250,9 @@ func getHCAInfo(hostname, hca, infoType string, sshKeyPath string) (string, erro
 }
 
 // getHCAInfoRoot 获取 HCA 根目录的信息（如 fw_ver, board_id）
-func getHCAInfoRoot(hostname, hca, infoType string, sshKeyPath string) (string, error) {
+func getHCAInfoRoot(hostname, hca, infoType string, sshKeyPath, user string) (string, error) {
 	path := fmt.Sprintf("/sys/class/infiniband/%s/%s", hca, infoType)
-	cmd := tools.BuildSSHCommand(hostname, fmt.Sprintf("cat %s", path), sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, fmt.Sprintf("cat %s", path), sshKeyPath, user)
 
 	// 设置超时
 	timer := time.AfterFunc(10*time.Second, func() {

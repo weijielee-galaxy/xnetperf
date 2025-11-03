@@ -121,7 +121,7 @@ func execCollectCommand(cfg *config.Config) error {
 		wg.Add(1)
 		go func(host string) {
 			defer wg.Done()
-			collectFromHost(host, cfg.Report.Dir, reportsDir, cfg.SSH.PrivateKey)
+			collectFromHost(host, cfg.Report.Dir, reportsDir, cfg.SSH.PrivateKey, cfg.SSH.User)
 		}(hostname)
 	}
 
@@ -130,7 +130,7 @@ func execCollectCommand(cfg *config.Config) error {
 	return nil
 }
 
-func collectFromHost(hostname, remoteDir, localBaseDir, sshKeyPath string) {
+func collectFromHost(hostname, remoteDir, localBaseDir, sshKeyPath, user string) {
 	// 为每个主机创建本地子目录
 	hostDir := filepath.Join(localBaseDir, hostname)
 	err := os.MkdirAll(hostDir, 0755)
@@ -169,19 +169,19 @@ func collectFromHost(hostname, remoteDir, localBaseDir, sshKeyPath string) {
 
 		// 仅在启用cleanup标志时清理远程主机上的报告文件
 		if cleanupRemote {
-			cleanupRemoteFiles(hostname, remoteDir, sshKeyPath)
+			cleanupRemoteFiles(hostname, remoteDir, sshKeyPath, user)
 		}
 	} else {
 		fmt.Printf("   [INFO] ℹ️  %s: No report files found\n", hostname)
 	}
 }
 
-func cleanupRemoteFiles(hostname, remoteDir, sshKeyPath string) {
+func cleanupRemoteFiles(hostname, remoteDir, sshKeyPath, user string) {
 	fmt.Printf("   [CLEANUP] 🧹 %s: Cleaning up remote report files...\n", hostname)
 
 	// 首先检查远程目录中是否还有属于当前主机的JSON文件
 	checkCmd := fmt.Sprintf("ls %s/*%s*.json 2>/dev/null | wc -l", remoteDir, hostname)
-	checkExec := tools.BuildSSHCommand(hostname, checkCmd, sshKeyPath)
+	checkExec := tools.BuildSSHCommand(hostname, checkCmd, sshKeyPath, user)
 
 	checkOutput, err := checkExec.CombinedOutput()
 	if err != nil {
@@ -197,7 +197,7 @@ func cleanupRemoteFiles(hostname, remoteDir, sshKeyPath string) {
 
 	// 使用SSH删除远程主机上属于当前主机的JSON报告文件（安全匹配）
 	rmCmd := fmt.Sprintf("rm -f %s/*%s*.json", remoteDir, hostname)
-	cmd := tools.BuildSSHCommand(hostname, rmCmd, sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, rmCmd, sshKeyPath, user)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -210,7 +210,7 @@ func cleanupRemoteFiles(hostname, remoteDir, sshKeyPath string) {
 
 	// 验证清理是否成功
 	verifyCmd := fmt.Sprintf("ls %s/*%s*.json 2>/dev/null | wc -l", remoteDir, hostname)
-	verifyExec := tools.BuildSSHCommand(hostname, verifyCmd, sshKeyPath)
+	verifyExec := tools.BuildSSHCommand(hostname, verifyCmd, sshKeyPath, user)
 
 	verifyOutput, err := verifyExec.CombinedOutput()
 	if err == nil && string(verifyOutput) == "0\n" {

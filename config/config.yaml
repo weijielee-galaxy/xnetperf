@@ -18,6 +18,7 @@ run:
   duration_seconds: 10 # Duration of the test in seconds if not running infinitely, default is 10
 
 ssh:
+  user: "root" # SSH username for remote hosts, default is "root"
   private_key: "~/.ssh/id_rsa" # Path to the SSH private key for authentication, default is "~/.ssh/id_rsa"
 
 server:

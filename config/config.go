@@ -51,6 +51,7 @@ type Run struct {
 }
 
 type SSH struct {
+	User       string `yaml:"user" json:"user"`
 	PrivateKey string `yaml:"private_key" json:"private_key"`
 }
 
@@ -117,6 +118,7 @@ func NewDefaultConfig() *Config {
 			DurationSeconds: 10,
 		},
 		SSH: SSH{
+			User:       "root",
 			PrivateKey: "~/.ssh/id_rsa",
 		},
 		Server: ServerConfig{
@@ -170,6 +172,9 @@ func (c *Config) ApplyDefaults() {
 		c.Run.DurationSeconds = 10
 	}
 	// SSH defaults
+	if c.SSH.User == "" {
+		c.SSH.User = "root"
+	}
 	if c.SSH.PrivateKey == "" {
 		c.SSH.PrivateKey = "~/.ssh/id_rsa"
 	}
@@ -277,7 +282,10 @@ func (cfg *Config) LookupServerHostsIP() (map[string]string, error) {
 func (cfg *Config) getHostIP(hostname string) (string, error) {
 	command := fmt.Sprintf(`ip -4 addr show %s | grep -oP '(?<=inet\s)\d+(\.\d+){3}'`, cfg.NetworkInterface)
 
-	sshWrapper := tools.NewSSHWrapper(hostname).PrivateKey(cfg.SSH.PrivateKey).Command(command)
+	sshWrapper := tools.NewSSHWrapper(hostname).
+		User(cfg.SSH.User).
+		PrivateKey(cfg.SSH.PrivateKey).
+		Command(command)
 
 	fmt.Println(sshWrapper.String())
 

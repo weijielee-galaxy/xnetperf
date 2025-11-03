@@ -115,7 +115,7 @@ func execPrecheckCommand(cfg *config.Config) bool {
 	fmt.Printf("Checking %d HCAs across all hosts...\n\n", len(checkItems))
 
 	// 并发执行检查
-	results := precheckAllHCAs(checkItems, cfg.SSH.PrivateKey)
+	results := precheckAllHCAs(checkItems, cfg.SSH.PrivateKey, cfg.SSH.User)
 
 	// 显示结果
 	displayPrecheckResults(results)
@@ -151,7 +151,7 @@ func execPrecheckCommand(cfg *config.Config) bool {
 func precheckAllHCAs(checkItems []struct {
 	hostname string
 	hca      string
-}, sshKeyPath string) []PrecheckResult {
+}, sshKeyPath, user string) []PrecheckResult {
 	var results []PrecheckResult
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -160,7 +160,7 @@ func precheckAllHCAs(checkItems []struct {
 		wg.Add(1)
 		go func(hostname, hca string) {
 			defer wg.Done()
-			result := precheckHCA(hostname, hca, sshKeyPath)
+			result := precheckHCA(hostname, hca, sshKeyPath, user)
 
 			mu.Lock()
 			results = append(results, result)
@@ -172,7 +172,7 @@ func precheckAllHCAs(checkItems []struct {
 	return results
 }
 
-func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
+func precheckHCA(hostname, hca, sshKeyPath, user string) PrecheckResult {
 	result := PrecheckResult{
 		Hostname: hostname,
 		HCA:      hca,
@@ -180,7 +180,7 @@ func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 
 	// 检查物理状态
 	physStateCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/ports/1/phys_state", hca)
-	cmd := tools.BuildSSHCommand(hostname, physStateCmd, sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, physStateCmd, sshKeyPath, user)
 	physOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -190,7 +190,7 @@ func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 
 	// 检查逻辑状态
 	stateCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/ports/1/state", hca)
-	cmd = tools.BuildSSHCommand(hostname, stateCmd, sshKeyPath)
+	cmd = tools.BuildSSHCommand(hostname, stateCmd, sshKeyPath, user)
 	stateOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -200,7 +200,7 @@ func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 
 	// 检查网卡速度
 	speedCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/ports/1/rate", hca)
-	cmd = tools.BuildSSHCommand(hostname, speedCmd, sshKeyPath)
+	cmd = tools.BuildSSHCommand(hostname, speedCmd, sshKeyPath, user)
 	speedOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -210,7 +210,7 @@ func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 
 	// 检查固件版本
 	fwVerCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/fw_ver", hca)
-	cmd = tools.BuildSSHCommand(hostname, fwVerCmd, sshKeyPath)
+	cmd = tools.BuildSSHCommand(hostname, fwVerCmd, sshKeyPath, user)
 	fwVerOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -220,7 +220,7 @@ func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 
 	// 检查板卡ID
 	boardIdCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/board_id", hca)
-	cmd = tools.BuildSSHCommand(hostname, boardIdCmd, sshKeyPath)
+	cmd = tools.BuildSSHCommand(hostname, boardIdCmd, sshKeyPath, user)
 	boardIdOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -230,7 +230,7 @@ func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 
 	// 检查系统序列号
 	serialNumberCmd := "cat /sys/class/dmi/id/product_serial"
-	cmd = tools.BuildSSHCommand(hostname, serialNumberCmd, sshKeyPath)
+	cmd = tools.BuildSSHCommand(hostname, serialNumberCmd, sshKeyPath, user)
 	serialNumberOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -672,7 +672,7 @@ func ExecPrecheck(cfg *config.Config) (*PrecheckSummary, error) {
 	}
 
 	// 并发执行检查
-	results := precheckAllHCAs(checkItems, cfg.SSH.PrivateKey)
+	results := precheckAllHCAs(checkItems, cfg.SSH.PrivateKey, cfg.SSH.User)
 
 	// 统计信息
 	summary := &PrecheckSummary{

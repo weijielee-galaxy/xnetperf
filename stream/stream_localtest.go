@@ -34,7 +34,7 @@ func GenerateLocaltestScript(cfg *config.Config) {
 	for _, Server := range allHosts {
 		port := cfg.StartPort
 		// 3. Run the command and capture the combined output (stdout and stderr).
-		output, err := getHostIP(Server, cfg.SSH.PrivateKey, cfg.NetworkInterface)
+		output, err := getHostIP(Server, cfg.SSH.PrivateKey, cfg.SSH.User, cfg.NetworkInterface)
 		if err != nil {
 			// If command fails, return the output for debugging and a detailed error.
 			fmt.Printf("Error executing command on %s: %v\nOutput: %s\n", Server, err, string(output))

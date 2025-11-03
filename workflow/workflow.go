@@ -106,7 +106,7 @@ func cleanupRemoteReportFiles(cfg *config.Config) error {
 
 			// 删除远程主机上属于当前主机的JSON报告文件
 			rmCmd := fmt.Sprintf("rm -f %s/*%s*.json", cfg.Report.Dir, host)
-			cmd := tools.BuildSSHCommand(host, rmCmd, cfg.SSH.PrivateKey)
+			cmd := tools.BuildSSHCommand(host, rmCmd, cfg.SSH.PrivateKey, cfg.SSH.User)
 
 			output, err := cmd.CombinedOutput()
 			if err != nil {
@@ -168,7 +168,7 @@ func ExecuteProbe(cfg *config.Config) (*ProbeSummary, error) {
 	}
 
 	// 探测所有主机
-	results := probeAllHosts(allHosts, cfg.SSH.PrivateKey)
+	results := probeAllHosts(allHosts, cfg.SSH.PrivateKey, cfg.SSH.User)
 
 	// 统计信息
 	summary := &ProbeSummary{
@@ -193,7 +193,7 @@ func ExecuteProbe(cfg *config.Config) (*ProbeSummary, error) {
 	return summary, nil
 }
 
-func probeAllHosts(hosts map[string]bool, sshKeyPath string) []ProbeResult {
+func probeAllHosts(hosts map[string]bool, sshKeyPath, user string) []ProbeResult {
 	var results []ProbeResult
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -202,7 +202,7 @@ func probeAllHosts(hosts map[string]bool, sshKeyPath string) []ProbeResult {
 		wg.Add(1)
 		go func(host string) {
 			defer wg.Done()
-			result := probeHost(host, sshKeyPath)
+			result := probeHost(host, sshKeyPath, user)
 
 			mu.Lock()
 			results = append(results, result)
@@ -214,13 +214,13 @@ func probeAllHosts(hosts map[string]bool, sshKeyPath string) []ProbeResult {
 	return results
 }
 
-func probeHost(hostname string, sshKeyPath string) ProbeResult {
+func probeHost(hostname string, sshKeyPath, user string) ProbeResult {
 	result := ProbeResult{
 		Hostname: hostname,
 	}
 
 	// 使用SSH执行ps命令查找ib_write_bw进程
-	cmd := tools.BuildSSHCommand(hostname, "ps aux | grep ib_write_bw | grep -v grep", sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, "ps aux | grep ib_write_bw | grep -v grep", sshKeyPath, user)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {

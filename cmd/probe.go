@@ -77,7 +77,7 @@ func execProbeCommand(cfg *config.Config) {
 	fmt.Println()
 
 	for {
-		results := probeAllHosts(allHosts, cfg.SSH.PrivateKey)
+		results := probeAllHosts(allHosts, cfg.SSH.PrivateKey, cfg.SSH.User)
 		displayProbeResults(results)
 
 		// 如果是一次性探测，直接退出
@@ -113,7 +113,7 @@ type ProbeResult struct {
 	Status       string
 }
 
-func probeAllHosts(hosts map[string]bool, sshKeyPath string) []ProbeResult {
+func probeAllHosts(hosts map[string]bool, sshKeyPath, user string) []ProbeResult {
 	var results []ProbeResult
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -122,7 +122,7 @@ func probeAllHosts(hosts map[string]bool, sshKeyPath string) []ProbeResult {
 		wg.Add(1)
 		go func(host string) {
 			defer wg.Done()
-			result := probeHost(host, sshKeyPath)
+			result := probeHost(host, sshKeyPath, user)
 
 			mu.Lock()
 			results = append(results, result)
@@ -134,13 +134,13 @@ func probeAllHosts(hosts map[string]bool, sshKeyPath string) []ProbeResult {
 	return results
 }
 
-func probeHost(hostname, sshKeyPath string) ProbeResult {
+func probeHost(hostname, sshKeyPath, user string) ProbeResult {
 	result := ProbeResult{
 		Hostname: hostname,
 	}
 
 	// 使用SSH执行ps命令查找ib_write_bw进程
-	cmd := tools.BuildSSHCommand(hostname, "ps aux | grep ib_write_bw | grep -v grep", sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, "ps aux | grep ib_write_bw | grep -v grep", sshKeyPath, user)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {

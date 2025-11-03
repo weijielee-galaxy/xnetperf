@@ -244,7 +244,7 @@ func execLatencyProbeCommand(cfg *config.Config) {
 	probeIntervalSec := 5
 
 	for {
-		results := probeLatencyAllHosts(allHosts, cfg.SSH.PrivateKey)
+		results := probeLatencyAllHosts(allHosts, cfg.SSH.PrivateKey, cfg.SSH.User)
 		displayLatencyProbeResults(results)
 
 		// Check if all processes have completed
@@ -762,7 +762,7 @@ type LatencyProbeResult struct {
 }
 
 // probeLatencyAllHosts probes all hosts for ib_write_lat processes
-func probeLatencyAllHosts(hosts map[string]bool, sshKeyPath string) []LatencyProbeResult {
+func probeLatencyAllHosts(hosts map[string]bool, sshKeyPath, user string) []LatencyProbeResult {
 	var results []LatencyProbeResult
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -771,7 +771,7 @@ func probeLatencyAllHosts(hosts map[string]bool, sshKeyPath string) []LatencyPro
 		wg.Add(1)
 		go func(host string) {
 			defer wg.Done()
-			result := probeLatencyHost(host, sshKeyPath)
+			result := probeLatencyHost(host, sshKeyPath, user)
 
 			mu.Lock()
 			results = append(results, result)
@@ -784,13 +784,13 @@ func probeLatencyAllHosts(hosts map[string]bool, sshKeyPath string) []LatencyPro
 }
 
 // probeLatencyHost probes a single host for ib_write_lat processes
-func probeLatencyHost(hostname, sshKeyPath string) LatencyProbeResult {
+func probeLatencyHost(hostname, sshKeyPath, user string) LatencyProbeResult {
 	result := LatencyProbeResult{
 		Hostname: hostname,
 	}
 
 	// Use SSH to execute ps command to find ib_write_lat processes
-	cmd := tools.BuildSSHCommand(hostname, "ps aux | grep ib_write_lat | grep -v grep", sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, "ps aux | grep ib_write_lat | grep -v grep", sshKeyPath, user)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {

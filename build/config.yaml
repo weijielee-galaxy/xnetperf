@@ -18,6 +18,7 @@ run:
   duration_seconds: 20
 
 ssh:
+  user: "root"  # SSH username for remote hosts, default is "root"
   private_key: ""
 
 server:
