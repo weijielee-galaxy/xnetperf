@@ -274,7 +274,7 @@ func Precheck(cfg *config.Config) []PrecheckResult {
 	hostCommands := buildHostCommands(hostHCAs)
 
 	// 3. 并发执行命令，收集结果（DTO层）
-	hostDataList := execPrecheckCommands(hostCommands, cfg.SSH.PrivateKey)
+	hostDataList := execPrecheckCommands(hostCommands, cfg.SSH.PrivateKey, cfg.SSH.User)
 
 	// 4. 转换为展示层数据
 	results := convertHostDataToResults(hostDataList)
@@ -417,7 +417,7 @@ func (h *HostPrecheckData) ValidateHCAs() {
 }
 
 // 3. 并发执行命令，收集结果并解析 JSON
-func execPrecheckCommands(hostCommands map[string]string, sshKeyPath string) []*HostPrecheckData {
+func execPrecheckCommands(hostCommands map[string]string, sshKeyPath, user string) []*HostPrecheckData {
 	var results []*HostPrecheckData
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -428,7 +428,7 @@ func execPrecheckCommands(hostCommands map[string]string, sshKeyPath string) []*
 			defer wg.Done()
 
 			// 执行单个主机的命令并解析结果
-			hostData := execAndParseHostCommand(host, cmd, sshKeyPath)
+			hostData := execAndParseHostCommand(host, cmd, sshKeyPath, user)
 
 			mu.Lock()
 			results = append(results, hostData)
@@ -482,13 +482,13 @@ func convertHostDataToResults(hostDataList []*HostPrecheckData) []PrecheckResult
 }
 
 // execAndParseHostCommand 执行单个主机的命令并解析 JSON 输出
-func execAndParseHostCommand(hostname, command, sshKeyPath string) *HostPrecheckData {
+func execAndParseHostCommand(hostname, command, sshKeyPath, user string) *HostPrecheckData {
 	result := &HostPrecheckData{
 		Hostname: hostname,
 	}
 
 	// 构建 SSH 命令
-	sshWrapper := tools.NewSSHWrapper(hostname, "'").PrivateKey(sshKeyPath).Command(command)
+	sshWrapper := tools.NewSSHWrapper(hostname, "'").PrivateKey(sshKeyPath).User(user).Command(command)
 	// fmt.Println(sshWrapper.String())
 	cmd := exec.Command("bash", "-c", sshWrapper.String())
 

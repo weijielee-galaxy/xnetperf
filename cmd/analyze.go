@@ -298,16 +298,16 @@ func displayClientTableFooter(serialNumberWidth, deviceWidth int) {
 func displayServerTableHeader(serialNumberWidth, deviceWidth int) {
 	serialNumberDashes := strings.Repeat("─", serialNumberWidth)
 	deviceDashes := strings.Repeat("─", deviceWidth)
-	fmt.Printf("┌─%s─┬─────────────────────┬─%s─┬─────────────┐\n", serialNumberDashes, deviceDashes)
-	fmt.Printf("│ %-*s │ Hostname            │ %-*s │ RX (Gbps)   │\n", serialNumberWidth, "Serial Number", deviceWidth, "Device")
-	fmt.Printf("├─%s─┼─────────────────────┼─%s─┼─────────────┤\n", serialNumberDashes, deviceDashes)
+	fmt.Printf("┌─%s─┬─────────────────────┬─%s─┬─────────────┬──────────────┬─────────────────┬──────────┐\n", serialNumberDashes, deviceDashes)
+	fmt.Printf("│ %-*s │ Hostname            │ %-*s │ RX (Gbps)   │ SPEC (Gbps)  │ DELTA           │ Status   │\n", serialNumberWidth, "Serial Number", deviceWidth, "Device")
+	fmt.Printf("├─%s─┼─────────────────────┼─%s─┼─────────────┼──────────────┼─────────────────┼──────────┤\n", serialNumberDashes, deviceDashes)
 }
 
 // displayServerTableFooter 显示服务端表格尾部（动态列宽）
 func displayServerTableFooter(serialNumberWidth, deviceWidth int) {
 	serialNumberDashes := strings.Repeat("─", serialNumberWidth)
 	deviceDashes := strings.Repeat("─", deviceWidth)
-	fmt.Printf("└─%s─┴─────────────────────┴─%s─┴─────────────┘\n", serialNumberDashes, deviceDashes)
+	fmt.Printf("└─%s─┴─────────────────────┴─%s─┴─────────────┴──────────────┴─────────────────┴──────────┘\n", serialNumberDashes, deviceDashes)
 }
 
 func displayResults(clientData, serverData map[string]map[string]*DeviceData, specSpeed float64) {
@@ -350,11 +350,11 @@ func displayResults(clientData, serverData map[string]map[string]*DeviceData, sp
 
 	fmt.Println()
 
-	// Display server data
+	// Display server data with enhanced table
 	fmt.Println("SERVER DATA (RX)")
 	displayServerTableHeader(maxSerialNumberLen, maxDeviceLen)
 
-	displayDataTable(serverData, true, maxSerialNumberLen, maxDeviceLen)
+	displayEnhancedServerTable(serverData, specSpeed, maxSerialNumberLen, maxDeviceLen)
 	displayServerTableFooter(maxSerialNumberLen, maxDeviceLen)
 }
 
@@ -427,12 +427,12 @@ func generateMarkdownTable(clientData, serverData map[string]map[string]*DeviceD
 	content += generateEnhancedMarkdownClientContent(clientData, theoreticalBWPerClient)
 	content += "\n"
 
-	// Server data table
+	// Server data table with enhanced columns
 	content += "## Server Data (RX)\n\n"
-	content += "| Hostname | Device | RX (Gbps) |\n"
-	content += "|----------|--------|----------|\n"
+	content += "| Hostname | Device | RX (Gbps) | SPEC (Gbps) | DELTA | Status |\n"
+	content += "|----------|--------|-----------|-------------|-------|--------|\n"
 
-	content += generateMarkdownTableContent(serverData)
+	content += generateEnhancedMarkdownServerContent(serverData, specSpeed)
 
 	return os.WriteFile("network_performance_analysis.md", []byte(content), 0644)
 }
@@ -554,6 +554,65 @@ func displayEnhancedClientTable(clientData map[string]map[string]*DeviceData, th
 	}
 }
 
+// displayEnhancedServerTable 显示增强的服务端表格（包含SPEC、DELTA和Status列）
+func displayEnhancedServerTable(serverData map[string]map[string]*DeviceData, specSpeed float64, serialNumberWidth, deviceWidth int) {
+	// Get sorted hostnames
+	var hostnames []string
+	for hostname := range serverData {
+		hostnames = append(hostnames, hostname)
+	}
+	sort.Strings(hostnames)
+
+	deviceDashes := strings.Repeat("─", deviceWidth)
+
+	for i, hostname := range hostnames {
+		devices := serverData[hostname]
+
+		// Get sorted devices
+		var deviceNames []string
+		for device := range devices {
+			deviceNames = append(deviceNames, device)
+		}
+		sort.Strings(deviceNames)
+
+		for j, device := range deviceNames {
+			data := devices[device]
+			actualBW := data.BWSum        // RX 带宽
+			delta := specSpeed - actualBW // DELTA = SPEC - RX
+			deltaPercent := float64(0)
+			if specSpeed > 0 {
+				deltaPercent = (delta / specSpeed) * 100
+			}
+
+			// 格式化DELTA列
+			deltaStr := fmt.Sprintf("%.1f(%.0f%%)", delta, deltaPercent)
+
+			// 计算状态 - 使用和客户端相同的逻辑
+			status := "OK"
+			if abs(deltaPercent) > 20 {
+				status = "NOT OK"
+			}
+
+			// Format serial number and hostname (only show for first device of each host)
+			serialNumberStr := ""
+			hostnameStr := ""
+			if j == 0 {
+				serialNumberStr = data.SerialNumber
+				hostnameStr = hostname
+			}
+
+			fmt.Printf("│ %-*s │ %-19s │ %-*s │ %11.2f │ %12.2f │ %15s │ %-8s │\n",
+				serialNumberWidth, serialNumberStr, hostnameStr, deviceWidth, device, actualBW, specSpeed, deltaStr, status)
+		}
+
+		// Add separator between different hostnames (except for the last one)
+		if i < len(hostnames)-1 && len(serverData[hostname]) > 0 {
+			serialNumberDashes := strings.Repeat("─", serialNumberWidth)
+			fmt.Printf("├─%s─┼─────────────────────┼─%s─┼─────────────┼──────────────┼─────────────────┼──────────┤\n", serialNumberDashes, deviceDashes)
+		}
+	}
+}
+
 // abs 返回浮点数的绝对值
 func abs(x float64) float64 {
 	if x < 0 {
@@ -609,6 +668,59 @@ func generateEnhancedMarkdownClientContent(clientData map[string]map[string]*Dev
 
 			content.WriteString(fmt.Sprintf("| %s | %s | %.2f | %.2f | %s | %s |\n",
 				hostnameStr, device, actualBW, theoreticalBW, deltaStr, status))
+		}
+	}
+
+	return content.String()
+}
+
+// generateEnhancedMarkdownServerContent 生成增强的服务端Markdown表格内容
+func generateEnhancedMarkdownServerContent(serverData map[string]map[string]*DeviceData, specSpeed float64) string {
+	var content strings.Builder
+
+	// Get sorted hostnames
+	var hostnames []string
+	for hostname := range serverData {
+		hostnames = append(hostnames, hostname)
+	}
+	sort.Strings(hostnames)
+
+	for _, hostname := range hostnames {
+		devices := serverData[hostname]
+
+		// Get sorted devices
+		var deviceNames []string
+		for device := range devices {
+			deviceNames = append(deviceNames, device)
+		}
+		sort.Strings(deviceNames)
+
+		for j, device := range deviceNames {
+			data := devices[device]
+			actualBW := data.BWSum        // RX 带宽
+			delta := specSpeed - actualBW // DELTA = SPEC - RX
+			deltaPercent := float64(0)
+			if specSpeed > 0 {
+				deltaPercent = (delta / specSpeed) * 100
+			}
+
+			// 格式化DELTA列
+			deltaStr := fmt.Sprintf("%.1f(%.0f%%)", delta, deltaPercent)
+
+			// 计算状态 - 使用和客户端相同的逻辑
+			status := "OK"
+			if abs(deltaPercent) > 20 {
+				status = "NOT OK"
+			}
+
+			// Format hostname (only show for first device of each host)
+			hostnameStr := ""
+			if j == 0 {
+				hostnameStr = hostname
+			}
+
+			content.WriteString(fmt.Sprintf("| %s | %s | %.2f | %.2f | %s | %s |\n",
+				hostnameStr, device, actualBW, specSpeed, deltaStr, status))
 		}
 	}
 

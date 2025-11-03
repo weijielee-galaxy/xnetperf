@@ -370,6 +370,7 @@ func (e *Executor) executeRemote(script *generator.HostScript) error {
 
 	sshWrapper := tools.NewSSHWrapper(script.Host).
 		PrivateKey(e.cfg.SSH.PrivateKey).
+		User(e.cfg.SSH.User).
 		Command(script.Command)
 	cmd := exec.Command("bash", "-c", sshWrapper.String())
 	err := cmd.Run()
