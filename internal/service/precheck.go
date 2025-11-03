@@ -489,7 +489,7 @@ func execAndParseHostCommand(hostname, command, sshKeyPath string) *HostPrecheck
 
 	// 构建 SSH 命令
 	sshWrapper := tools.NewSSHWrapper(hostname, "'").PrivateKey(sshKeyPath).Command(command)
-	fmt.Println(sshWrapper.String())
+	// fmt.Println(sshWrapper.String())
 	cmd := exec.Command("bash", "-c", sshWrapper.String())
 
 	output, err := cmd.CombinedOutput()
@@ -810,7 +810,7 @@ func DisplayPrecheckResultsV1(results []PrecheckResult) {
 
 // DisplayPrecheckResultsV2 使用新的展示层DTO（清晰分离着色和展示逻辑）
 func DisplayPrecheckResultsV2(results []PrecheckResult) {
-	fmt.Printf("=== Precheck Results V2 (优雅分层) - %s ===\n\n", time.Now().Format("15:04:05"))
+	fmt.Printf("=== Precheck Results - %s ===\n\n", time.Now().Format("15:04:05"))
 
 	// 1. 创建展示数据（应用着色规则）
 	displayData := NewPrecheckDisplayData(results)

@@ -31,3 +31,8 @@ func TestBuildHostCommands(t *testing.T) {
 		fmt.Printf("Host: %s, Command: %s\n", host, cmd)
 	}
 }
+
+func TestColorOutput(t *testing.T) {
+	fmt.Println("Hello, World!")
+	fmt.Println(ColorGreen + "This is a green text!" + ColorReset)
+}
