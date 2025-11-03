@@ -149,6 +149,9 @@ func collectFromHost(hostname, remoteDir, localBaseDir, sshKeyPath, user string)
 		hostname = fmt.Sprintf("%s@%s", user, hostname)
 	}
 	cmd := exec.Command("scp", fmt.Sprintf("%s:%s", hostname, scpCmd), hostDir+"/")
+	if sshKeyPath != "" {
+		cmd = exec.Command("scp", "-i", sshKeyPath, fmt.Sprintf("%s:%s", hostname, scpCmd), hostDir+"/")
+	}
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
