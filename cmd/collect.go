@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 	"xnetperf/config"
+	"xnetperf/pkg/tools"
 
 	"github.com/spf13/cobra"
 )
@@ -180,7 +181,7 @@ func cleanupRemoteFiles(hostname, remoteDir, sshKeyPath string) {
 
 	// 首先检查远程目录中是否还有属于当前主机的JSON文件
 	checkCmd := fmt.Sprintf("ls %s/*%s*.json 2>/dev/null | wc -l", remoteDir, hostname)
-	checkExec := buildSSHCommand(hostname, checkCmd, sshKeyPath)
+	checkExec := tools.BuildSSHCommand(hostname, checkCmd, sshKeyPath)
 
 	checkOutput, err := checkExec.CombinedOutput()
 	if err != nil {
@@ -196,7 +197,7 @@ func cleanupRemoteFiles(hostname, remoteDir, sshKeyPath string) {
 
 	// 使用SSH删除远程主机上属于当前主机的JSON报告文件（安全匹配）
 	rmCmd := fmt.Sprintf("rm -f %s/*%s*.json", remoteDir, hostname)
-	cmd := buildSSHCommand(hostname, rmCmd, sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, rmCmd, sshKeyPath)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -209,7 +210,7 @@ func cleanupRemoteFiles(hostname, remoteDir, sshKeyPath string) {
 
 	// 验证清理是否成功
 	verifyCmd := fmt.Sprintf("ls %s/*%s*.json 2>/dev/null | wc -l", remoteDir, hostname)
-	verifyExec := buildSSHCommand(hostname, verifyCmd, sshKeyPath)
+	verifyExec := tools.BuildSSHCommand(hostname, verifyCmd, sshKeyPath)
 
 	verifyOutput, err := verifyExec.CombinedOutput()
 	if err == nil && string(verifyOutput) == "0\n" {

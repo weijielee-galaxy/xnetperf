@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"xnetperf/config"
+	"xnetperf/pkg/tools"
 )
 
 // ValidateP2PConfig validates P2P configuration requirements
@@ -159,7 +160,7 @@ func generateP2PScriptPair(cfg *config.Config, serverHost, serverHca, serverIP,
 // getHostIP retrieves the IP address of a host using specified network interface
 func getHostIP(hostname string, sshKeyPath string, networkInterface string) (string, error) {
 	command := fmt.Sprintf("ip addr show %s | grep 'inet ' | awk '{print $2}' | cut -d'/' -f1", networkInterface)
-	cmd := buildSSHCommand(hostname, command, sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, command, sshKeyPath)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {

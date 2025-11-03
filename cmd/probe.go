@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"xnetperf/config"
+	"xnetperf/pkg/tools"
 
 	"github.com/spf13/cobra"
 )
@@ -139,7 +140,7 @@ func probeHost(hostname, sshKeyPath string) ProbeResult {
 	}
 
 	// 使用SSH执行ps命令查找ib_write_bw进程
-	cmd := buildSSHCommand(hostname, "ps aux | grep ib_write_bw | grep -v grep", sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, "ps aux | grep ib_write_bw | grep -v grep", sshKeyPath)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {

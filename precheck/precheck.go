@@ -2,13 +2,13 @@ package precheck
 
 import (
 	"fmt"
-	"os/exec"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"xnetperf/config"
+	"xnetperf/pkg/tools"
 )
 
 // PrecheckResult 表示预检查结果
@@ -233,7 +233,7 @@ func cleanStateString(stateStr string) string {
 
 func getHCAInfo(hostname, hca, infoType string, sshKeyPath string) (string, error) {
 	path := fmt.Sprintf("/sys/class/infiniband/%s/ports/1/%s", hca, infoType)
-	cmd := buildSSHCommand(hostname, fmt.Sprintf("cat %s", path), sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, fmt.Sprintf("cat %s", path), sshKeyPath)
 
 	// 设置超时
 	timer := time.AfterFunc(10*time.Second, func() {
@@ -252,7 +252,7 @@ func getHCAInfo(hostname, hca, infoType string, sshKeyPath string) (string, erro
 // getHCAInfoRoot 获取 HCA 根目录的信息（如 fw_ver, board_id）
 func getHCAInfoRoot(hostname, hca, infoType string, sshKeyPath string) (string, error) {
 	path := fmt.Sprintf("/sys/class/infiniband/%s/%s", hca, infoType)
-	cmd := buildSSHCommand(hostname, fmt.Sprintf("cat %s", path), sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, fmt.Sprintf("cat %s", path), sshKeyPath)
 
 	// 设置超时
 	timer := time.AfterFunc(10*time.Second, func() {
@@ -266,12 +266,4 @@ func getHCAInfoRoot(hostname, hca, infoType string, sshKeyPath string) (string, 
 	}
 
 	return string(output), nil
-}
-
-// buildSSHCommand builds an ssh command with optional private key
-func buildSSHCommand(hostname, remoteCmd, sshKeyPath string) *exec.Cmd {
-	if sshKeyPath != "" {
-		return exec.Command("ssh", "-i", sshKeyPath, hostname, remoteCmd)
-	}
-	return exec.Command("ssh", hostname, remoteCmd)
 }

@@ -22,6 +22,7 @@ type SSHWrapper struct {
 	redirectOutput string
 	sleepAfter     string
 	quoteType      QuoteType
+	options        []string // SSH options (e.g., "-o StrictHostKeyChecking=no")
 }
 
 // NewSSHWrapper creates a new SSH command wrapper
@@ -36,6 +37,10 @@ func NewSSHWrapper(host string, quoteType ...QuoteType) *SSHWrapper {
 		redirectOutput: "",
 		sleepAfter:     "",
 		quoteType:      qt,
+		options: []string{
+			"-o StrictHostKeyChecking=no", // 不询问是否添加 known_hosts
+			"-o LogLevel=ERROR",           // 只输出错误日志，抑制 Warning
+		},
 	}
 }
 
@@ -69,12 +74,30 @@ func (w *SSHWrapper) SleepAfter(duration string) *SSHWrapper {
 	return w
 }
 
+// AddOption adds a custom SSH option (e.g., "-o ConnectTimeout=10")
+func (w *SSHWrapper) AddOption(option string) *SSHWrapper {
+	w.options = append(w.options, option)
+	return w
+}
+
+// ClearOptions removes all SSH options
+func (w *SSHWrapper) ClearOptions() *SSHWrapper {
+	w.options = nil
+	return w
+}
+
 // Build generates the complete SSH command string
 func (w *SSHWrapper) Build() string {
 	var cmd strings.Builder
 
-	// SSH command with optional private key
+	// SSH command with options and optional private key
 	cmd.WriteString("ssh")
+
+	// Add SSH options
+	for _, opt := range w.options {
+		cmd.WriteString(fmt.Sprintf(" %s", opt))
+	}
+
 	if w.privateKeyPath != "" {
 		cmd.WriteString(fmt.Sprintf(" -i %s", w.privateKeyPath))
 	}

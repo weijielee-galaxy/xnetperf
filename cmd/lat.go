@@ -12,6 +12,7 @@ import (
 
 	"xnetperf/config"
 	"xnetperf/internal/script"
+	"xnetperf/pkg/tools"
 	"xnetperf/stream"
 
 	"github.com/spf13/cobra"
@@ -789,7 +790,7 @@ func probeLatencyHost(hostname, sshKeyPath string) LatencyProbeResult {
 	}
 
 	// Use SSH to execute ps command to find ib_write_lat processes
-	cmd := buildSSHCommand(hostname, "ps aux | grep ib_write_lat | grep -v grep", sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, "ps aux | grep ib_write_lat | grep -v grep", sshKeyPath)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {

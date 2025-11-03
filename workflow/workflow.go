@@ -12,6 +12,7 @@ import (
 
 	"xnetperf/config"
 	"xnetperf/internal/script"
+	"xnetperf/pkg/tools"
 	"xnetperf/stream"
 )
 
@@ -105,7 +106,7 @@ func cleanupRemoteReportFiles(cfg *config.Config) error {
 
 			// 删除远程主机上属于当前主机的JSON报告文件
 			rmCmd := fmt.Sprintf("rm -f %s/*%s*.json", cfg.Report.Dir, host)
-			cmd := buildSSHCommand(host, rmCmd, cfg.SSH.PrivateKey)
+			cmd := tools.BuildSSHCommand(host, rmCmd, cfg.SSH.PrivateKey)
 
 			output, err := cmd.CombinedOutput()
 			if err != nil {
@@ -219,7 +220,7 @@ func probeHost(hostname string, sshKeyPath string) ProbeResult {
 	}
 
 	// 使用SSH执行ps命令查找ib_write_bw进程
-	cmd := buildSSHCommand(hostname, "ps aux | grep ib_write_bw | grep -v grep", sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, "ps aux | grep ib_write_bw | grep -v grep", sshKeyPath)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -736,12 +737,4 @@ func abs(x float64) float64 {
 		return -x
 	}
 	return x
-}
-
-// buildSSHCommand builds an ssh command with optional private key
-func buildSSHCommand(hostname, remoteCmd, sshKeyPath string) *exec.Cmd {
-	if sshKeyPath != "" {
-		return exec.Command("ssh", "-i", sshKeyPath, hostname, remoteCmd)
-	}
-	return exec.Command("ssh", hostname, remoteCmd)
 }

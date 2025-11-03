@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"sort"
 	"strings"
 	"sync"
@@ -11,6 +10,7 @@ import (
 
 	"xnetperf/config"
 	"xnetperf/internal/service"
+	"xnetperf/pkg/tools"
 
 	"github.com/spf13/cobra"
 )
@@ -35,14 +35,6 @@ type PrecheckResult struct {
 	SerialNumber string
 	IsHealthy    bool
 	Error        string
-}
-
-// buildSSHCommand builds an ssh command with optional private key
-func buildSSHCommand(hostname, remoteCmd, sshKeyPath string) *exec.Cmd {
-	if sshKeyPath != "" {
-		return exec.Command("ssh", "-i", sshKeyPath, hostname, remoteCmd)
-	}
-	return exec.Command("ssh", hostname, remoteCmd)
 }
 
 var precheckCmd = &cobra.Command{
@@ -188,7 +180,7 @@ func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 
 	// 检查物理状态
 	physStateCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/ports/1/phys_state", hca)
-	cmd := buildSSHCommand(hostname, physStateCmd, sshKeyPath)
+	cmd := tools.BuildSSHCommand(hostname, physStateCmd, sshKeyPath)
 	physOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -198,7 +190,7 @@ func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 
 	// 检查逻辑状态
 	stateCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/ports/1/state", hca)
-	cmd = buildSSHCommand(hostname, stateCmd, sshKeyPath)
+	cmd = tools.BuildSSHCommand(hostname, stateCmd, sshKeyPath)
 	stateOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -208,7 +200,7 @@ func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 
 	// 检查网卡速度
 	speedCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/ports/1/rate", hca)
-	cmd = buildSSHCommand(hostname, speedCmd, sshKeyPath)
+	cmd = tools.BuildSSHCommand(hostname, speedCmd, sshKeyPath)
 	speedOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -218,7 +210,7 @@ func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 
 	// 检查固件版本
 	fwVerCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/fw_ver", hca)
-	cmd = buildSSHCommand(hostname, fwVerCmd, sshKeyPath)
+	cmd = tools.BuildSSHCommand(hostname, fwVerCmd, sshKeyPath)
 	fwVerOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -228,7 +220,7 @@ func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 
 	// 检查板卡ID
 	boardIdCmd := fmt.Sprintf("cat /sys/class/infiniband/%s/board_id", hca)
-	cmd = buildSSHCommand(hostname, boardIdCmd, sshKeyPath)
+	cmd = tools.BuildSSHCommand(hostname, boardIdCmd, sshKeyPath)
 	boardIdOutput, err := cmd.CombinedOutput()
 
 	if err != nil {
@@ -238,7 +230,7 @@ func precheckHCA(hostname, hca, sshKeyPath string) PrecheckResult {
 
 	// 检查系统序列号
 	serialNumberCmd := "cat /sys/class/dmi/id/product_serial"
-	cmd = buildSSHCommand(hostname, serialNumberCmd, sshKeyPath)
+	cmd = tools.BuildSSHCommand(hostname, serialNumberCmd, sshKeyPath)
 	serialNumberOutput, err := cmd.CombinedOutput()
 
 	if err != nil {

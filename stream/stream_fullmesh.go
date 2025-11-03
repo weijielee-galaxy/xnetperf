@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 	"xnetperf/config"
+	"xnetperf/pkg/tools"
 )
 
 // 假设所有的服务器都有同样的HCA数目
@@ -131,7 +132,7 @@ func ClearPreviewScript(hosts []string, sshKeyPath string) {
 			fmt.Printf("-> Sending command to %s...\n", hostname)
 
 			// Create the command: ssh <hostname> "killall ib_write_bw"
-			cmd := buildSSHCommand(hostname, "killall ib_write_bw", sshKeyPath)
+			cmd := tools.BuildSSHCommand(hostname, "killall ib_write_bw", sshKeyPath)
 
 			// Run the command and capture the combined standard output and standard error.
 			output, err := cmd.CombinedOutput()

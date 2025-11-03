@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"xnetperf/config"
+	"xnetperf/pkg/tools"
 
 	"github.com/spf13/cobra"
 )
@@ -44,7 +45,7 @@ func handleStopLatCommand(cfg *config.Config) {
 			defer wg.Done()
 
 			fmt.Printf("-> Contacting %s...\n", h)
-			cmd := buildSSHCommand(h, commandToStop, cfg.SSH.PrivateKey)
+			cmd := tools.BuildSSHCommand(h, commandToStop, cfg.SSH.PrivateKey)
 			output, err := cmd.CombinedOutput()
 
 			if err != nil {
