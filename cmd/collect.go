@@ -145,12 +145,13 @@ func collectFromHost(hostname, remoteDir, localBaseDir, sshKeyPath, user string)
 	// 使用scp收集属于当前主机的JSON报告文件（按主机名匹配）
 	// scp hostname:remoteDir/*hostname*.json localDir/
 	scpCmd := fmt.Sprintf("%s/*%s*.json", remoteDir, hostname)
+	var tmpHost string
 	if user != "" && !strings.Contains(hostname, "@") {
-		hostname = fmt.Sprintf("%s@%s", user, hostname)
+		tmpHost = fmt.Sprintf("%s@%s", user, hostname)
 	}
-	cmd := exec.Command("scp", fmt.Sprintf("%s:%s", hostname, scpCmd), hostDir+"/")
+	cmd := exec.Command("scp", fmt.Sprintf("%s:%s", tmpHost, scpCmd), hostDir+"/")
 	if sshKeyPath != "" {
-		cmd = exec.Command("scp", "-i", sshKeyPath, fmt.Sprintf("%s:%s", hostname, scpCmd), hostDir+"/")
+		cmd = exec.Command("scp", "-i", sshKeyPath, fmt.Sprintf("%s:%s", tmpHost, scpCmd), hostDir+"/")
 	}
 
 	output, err := cmd.CombinedOutput()
