@@ -14,9 +14,6 @@ func BuildHostScriptsFromCmdMap(hostCmds map[string][]string, user string) []*Ho
 		for _, cmd := range cmds {
 			cCmds = append(cCmds, "( "+cmd+" )")
 		}
-		if user != "" {
-			host = user + "@" + host
-		}
 		hs = append(hs, &HostScript{
 			Host:         host,
 			Command:      strings.Join(cCmds, delimiter),

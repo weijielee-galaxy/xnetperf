@@ -3,6 +3,7 @@ package script
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 
 	"xnetperf/config"
@@ -257,6 +258,10 @@ func (e *Executor) waitingForServerStart(sHosts []*generator.HostScript) {
 // probeProcessCount 探测指定主机上的 ib_write_bw 进程数量
 func (e *Executor) probeProcessCount(hostname string) int {
 	sshKeyPath := e.cfg.SSH.PrivateKey
+
+	if !strings.Contains(hostname, "@") && e.cfg.SSH.User != "" {
+		hostname = fmt.Sprintf("%s@%s", e.cfg.SSH.User, hostname)
+	}
 
 	command := fmt.Sprintf("ps aux | grep %s | grep -v grep | wc -l", e.TestType.Command())
 	// 构建SSH命令
