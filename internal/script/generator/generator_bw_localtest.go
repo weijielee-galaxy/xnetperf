@@ -90,8 +90,8 @@ func (g *bwLocaltestScriptGenerator) GenerateScripts() (*ScriptResult, error) {
 	}
 
 	// Build scripts grouped by host
-	sScripts := BuildHostScriptsFromCmdMap(serverCmdMap)
-	cScripts := BuildHostScriptsFromCmdMap(clientCmdMap)
+	sScripts := BuildHostScriptsFromCmdMap(serverCmdMap, g.cfg.SSH.User)
+	cScripts := BuildHostScriptsFromCmdMap(clientCmdMap, g.cfg.SSH.User)
 
 	return &ScriptResult{
 		ServerScripts: sScripts,

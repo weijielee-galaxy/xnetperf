@@ -86,8 +86,8 @@ func (g *bwP2PScriptGenerator) GenerateScripts() (*ScriptResult, error) {
 	}
 
 	// 按host构建脚本
-	sScripts := BuildHostScriptsFromCmdMap(serverCmdMap)
-	cScripts := BuildHostScriptsFromCmdMap(clientCmdMap)
+	sScripts := BuildHostScriptsFromCmdMap(serverCmdMap, g.cfg.SSH.User)
+	cScripts := BuildHostScriptsFromCmdMap(clientCmdMap, g.cfg.SSH.User)
 
 	return &ScriptResult{
 		ServerScripts: sScripts,

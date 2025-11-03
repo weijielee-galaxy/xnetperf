@@ -69,8 +69,8 @@ func (g *latIncastScriptGenerator) GenerateScripts() (*ScriptResult, error) {
 		}
 	}
 
-	sScripts := BuildHostScriptsFromCmdMap(serverCmdMap)
-	cScripts := BuildHostScriptsFromCmdMap(clientCmdMap)
+	sScripts := BuildHostScriptsFromCmdMap(serverCmdMap, g.cfg.SSH.User)
+	cScripts := BuildHostScriptsFromCmdMap(clientCmdMap, g.cfg.SSH.User)
 
 	return &ScriptResult{
 		ServerScripts: sScripts,

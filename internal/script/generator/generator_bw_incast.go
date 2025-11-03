@@ -74,8 +74,8 @@ func (g *bwIncastScriptGenerator) GenerateScripts() (*ScriptResult, error) {
 		}
 	}
 
-	sScripts := BuildHostScriptsFromCmdMap(sCmdMap)
-	cScripts := BuildHostScriptsFromCmdMap(cCmdMap)
+	sScripts := BuildHostScriptsFromCmdMap(sCmdMap, g.cfg.SSH.User)
+	cScripts := BuildHostScriptsFromCmdMap(cCmdMap, g.cfg.SSH.User)
 
 	return &ScriptResult{
 		ServerScripts: sScripts,

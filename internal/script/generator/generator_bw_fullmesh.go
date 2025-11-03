@@ -61,9 +61,9 @@ func (g *bwFullmeshScriptGenerator) GenerateScripts() (*ScriptResult, error) {
 	}
 
 	// Build server scripts
-	sScripts := BuildHostScriptsFromCmdMap(serverCmdMap)
+	sScripts := BuildHostScriptsFromCmdMap(serverCmdMap, g.cfg.SSH.User)
 	// Build client scripts
-	cScripts := BuildHostScriptsFromCmdMap(clientCmdMap)
+	cScripts := BuildHostScriptsFromCmdMap(clientCmdMap, g.cfg.SSH.User)
 
 	return &ScriptResult{
 		ServerScripts: sScripts,
