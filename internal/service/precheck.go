@@ -489,7 +489,7 @@ func execAndParseHostCommand(hostname, command, sshKeyPath, user string) *HostPr
 
 	// 构建 SSH 命令
 	sshWrapper := tools.NewSSHWrapper(hostname, "'").PrivateKey(sshKeyPath).User(user).Command(command)
-	// fmt.Println(sshWrapper.String())
+	fmt.Println(sshWrapper.String())
 	cmd := exec.Command("bash", "-c", sshWrapper.String())
 
 	output, err := cmd.CombinedOutput()
