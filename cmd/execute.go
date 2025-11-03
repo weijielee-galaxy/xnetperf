@@ -163,7 +163,7 @@ func executeAnalyzeStep(cfg *config.Config) bool {
 	switch cfg.StreamType {
 	case config.P2P:
 		// P2P analysis
-		p2pData, err := collectP2PReportData(reportsDir)
+		p2pData, err := collectP2PReportData(reportsDir, cfg.SSH.PrivateKey, cfg.SSH.User)
 		if err != nil {
 			fmt.Printf("❌ Error collecting P2P report data: %v\n", err)
 			return false
@@ -171,7 +171,7 @@ func executeAnalyzeStep(cfg *config.Config) bool {
 		displayP2PResults(p2pData)
 	default:
 		// Traditional fullmesh/incast analysis
-		clientData, serverData, err := collectReportData(reportsDir)
+		clientData, serverData, err := collectReportData(reportsDir, cfg)
 		if err != nil {
 			fmt.Printf("❌ Error collecting report data: %v\n", err)
 			return false

@@ -82,7 +82,7 @@ func runAnalyze(cmd *cobra.Command, args []string) {
 // runTraditionalAnalyze handles fullmesh and incast analysis with existing logic
 func runTraditionalAnalyze(reportsDir string, cfg *config.Config) {
 	// Collect all report data using existing function
-	clientData, serverData, err := collectReportData(reportsDir)
+	clientData, serverData, err := collectReportData(reportsDir, cfg)
 	if err != nil {
 		fmt.Printf("Error collecting report data: %v\n", err)
 		return
@@ -105,7 +105,7 @@ func runTraditionalAnalyze(reportsDir string, cfg *config.Config) {
 // runP2PAnalyze handles P2P-specific analysis
 func runP2PAnalyze(reportsDir string, cfg *config.Config) {
 	// Collect P2P report data
-	p2pData, err := collectP2PReportData(reportsDir)
+	p2pData, err := collectP2PReportData(reportsDir, cfg.SSH.PrivateKey, cfg.SSH.User)
 	if err != nil {
 		fmt.Printf("Error collecting P2P report data: %v\n", err)
 		return
@@ -126,9 +126,17 @@ func runP2PAnalyze(reportsDir string, cfg *config.Config) {
 }
 
 // getSerialNumberForHost 获取指定主机的序列号
-func getSerialNumberForHost(hostname string) string {
+func getSerialNumberForHost(hostname string, sshKeyPath string, user string) string {
 	// 尝试通过SSH获取系统序列号
-	cmd := exec.Command("ssh", hostname, "cat /sys/class/dmi/id/product_serial")
+	var cmd *exec.Cmd
+	if user != "" && !strings.Contains(hostname, "@") {
+		hostname = fmt.Sprintf("%s@%s", user, hostname)
+	}
+	if sshKeyPath != "" {
+		cmd = exec.Command("ssh", "-i", sshKeyPath, hostname, "cat /sys/class/dmi/id/product_serial")
+	} else {
+		cmd = exec.Command("ssh", hostname, "cat /sys/class/dmi/id/product_serial")
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "N/A"
@@ -150,7 +158,7 @@ func getSerialNumberForHost(hostname string) string {
 	return serialNumber
 }
 
-func collectReportData(reportsDir string) (map[string]map[string]*DeviceData, map[string]map[string]*DeviceData, error) {
+func collectReportData(reportsDir string, cfg *config.Config) (map[string]map[string]*DeviceData, map[string]map[string]*DeviceData, error) {
 	clientData := make(map[string]map[string]*DeviceData)
 	serverData := make(map[string]map[string]*DeviceData)
 
@@ -205,7 +213,7 @@ func collectReportData(reportsDir string) (map[string]map[string]*DeviceData, ma
 		// Initialize or update device data
 		if dataMap[hostname][device] == nil {
 			// Get serial number for this hostname
-			serialNumber := getSerialNumberForHost(hostname)
+			serialNumber := getSerialNumberForHost(hostname, cfg.SSH.PrivateKey, cfg.SSH.User)
 
 			dataMap[hostname][device] = &DeviceData{
 				Hostname:     hostname,
@@ -787,7 +795,7 @@ func parseReportFile(path string) (*Report, error) {
 }
 
 // collectP2PReportData collects report data specifically for P2P mode
-func collectP2PReportData(reportsDir string) (map[string]map[string]*P2PDeviceData, error) {
+func collectP2PReportData(reportsDir string, sshKeyPath string, user string) (map[string]map[string]*P2PDeviceData, error) {
 	p2pData := make(map[string]map[string]*P2PDeviceData)
 
 	err := filepath.Walk(reportsDir, func(path string, info os.FileInfo, err error) error {
@@ -848,7 +856,7 @@ func collectP2PReportData(reportsDir string) (map[string]map[string]*P2PDeviceDa
 		// Initialize or update device data
 		if p2pData[hostname][device] == nil {
 			// Get serial number for this hostname
-			serialNumber := getSerialNumberForHost(hostname)
+			serialNumber := getSerialNumberForHost(hostname, sshKeyPath, user)
 
 			p2pData[hostname][device] = &P2PDeviceData{
 				Hostname:     hostname,
