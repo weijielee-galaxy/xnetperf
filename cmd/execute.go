@@ -7,6 +7,8 @@ import (
 
 	"xnetperf/config"
 	"xnetperf/internal/script"
+	"xnetperf/internal/service"
+	v0 "xnetperf/internal/v0"
 
 	"github.com/spf13/cobra"
 )
@@ -89,10 +91,7 @@ func executeRunStep(cfg *config.Config) bool {
 	if cfg.Version == "v1" {
 		// executor 里面没有precheck 先添加在这里
 		fmt.Println("\n🔍 Step 0/5: Performing network card precheck...")
-		if !execPrecheckCommand(cfg) {
-			fmt.Printf("❌ Precheck failed! Network cards are not ready. Please fix the issues before running latency tests.\n")
-			os.Exit(1)
-		}
+		service.DisplayPrecheckResultsV2(service.Precheck(cfg))
 		fmt.Println("✅ Precheck passed! All network cards are healthy. Proceeding with latency tests...")
 
 		executor := script.NewExecutor(cfg, script.TestTypeBandwidth)
@@ -107,7 +106,7 @@ func executeRunStep(cfg *config.Config) bool {
 			os.Exit(1)
 		}
 	} else {
-		execRunCommand(cfg)
+		v0.ExecRunCommand(cfg)
 	}
 
 	fmt.Println("✅ Network tests started successfully")

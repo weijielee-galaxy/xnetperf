@@ -1004,7 +1004,7 @@ func generateP2PMarkdownTable(p2pData map[string]map[string]*P2PDeviceData) erro
 	}
 
 	if totalPairs > 0 {
-		content.WriteString(fmt.Sprintf("\n## Summary\n\n"))
+		content.WriteString("\n## Summary\n\n")
 		content.WriteString(fmt.Sprintf("- Total P2P pairs: %d\n", totalPairs))
 		content.WriteString(fmt.Sprintf("- Average speed: %.2f Gbps\n", totalSpeed/float64(totalPairs)))
 	}

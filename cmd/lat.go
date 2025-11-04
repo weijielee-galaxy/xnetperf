@@ -12,6 +12,7 @@ import (
 
 	"xnetperf/config"
 	"xnetperf/internal/script"
+	"xnetperf/internal/service"
 	"xnetperf/pkg/tools"
 	"xnetperf/stream"
 
@@ -51,10 +52,6 @@ Examples:
 	Run: runLat,
 }
 
-func init() {
-	// No additional flags needed - uses global config flag
-}
-
 func runLat(cmd *cobra.Command, args []string) {
 	fmt.Println("🚀 Starting xnetperf latency testing workflow...")
 	fmt.Println(strings.Repeat("=", 60))
@@ -68,10 +65,7 @@ func runLat(cmd *cobra.Command, args []string) {
 
 	// Step 0: Precheck - Verify network card status before starting tests
 	fmt.Println("\n🔍 Step 0/5: Performing network card precheck...")
-	if !execPrecheckCommand(cfg) {
-		fmt.Printf("❌ Precheck failed! Network cards are not ready. Please fix the issues before running latency tests.\n")
-		os.Exit(1)
-	}
+	service.DisplayPrecheckResultsV2(service.Precheck(cfg))
 	fmt.Println("✅ Precheck passed! All network cards are healthy. Proceeding with latency tests...")
 
 	if cfg.Version == "v1" {
