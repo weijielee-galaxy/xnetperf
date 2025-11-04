@@ -35,6 +35,7 @@ type Config struct {
 	Report             Report       `yaml:"report" json:"report"`
 	Run                Run          `yaml:"run" json:"run"`
 	SSH                SSH          `yaml:"ssh" json:"ssh"`
+	Logger             Logger       `yaml:"logger" json:"logger"`
 	Server             ServerConfig `yaml:"server" json:"server"`
 	Client             ClientConfig `yaml:"client" json:"client"`
 	Version            string       `yaml:"version" json:"version"`
@@ -53,6 +54,46 @@ type Run struct {
 type SSH struct {
 	User       string `yaml:"user" json:"user"`
 	PrivateKey string `yaml:"private_key" json:"private_key"`
+}
+
+// Logger holds the logger configuration
+type Logger struct {
+	LogLevel  string `yaml:"log_level" json:"log_level"`   // Log level: debug, info, warn, error
+	LogFormat string `yaml:"log_format" json:"log_format"` // Log format: text or json
+}
+
+// IsDebugLevel returns true if log level is debug
+func (l *Logger) IsDebugLevel() bool {
+	return strings.ToLower(l.LogLevel) == "debug"
+}
+
+// IsJSONFormat returns true if log format is json
+func (l *Logger) IsJSONFormat() bool {
+	return strings.ToLower(l.LogFormat) == "json"
+}
+
+// ValidateLogLevel validates if log level is valid
+func (l *Logger) ValidateLogLevel() error {
+	validLevels := map[string]bool{
+		"debug": true,
+		"info":  true,
+		"warn":  true,
+		"error": true,
+	}
+	level := strings.ToLower(l.LogLevel)
+	if !validLevels[level] {
+		return fmt.Errorf("invalid log level '%s', must be one of: debug, info, warn, error", l.LogLevel)
+	}
+	return nil
+}
+
+// ValidateLogFormat validates if log format is valid
+func (l *Logger) ValidateLogFormat() error {
+	format := strings.ToLower(l.LogFormat)
+	if format != "text" && format != "json" {
+		return fmt.Errorf("invalid log format '%s', must be 'text' or 'json'", l.LogFormat)
+	}
+	return nil
 }
 
 // ServerConfig holds the server-specific settings.
@@ -121,6 +162,10 @@ func NewDefaultConfig() *Config {
 			User:       "root",
 			PrivateKey: "~/.ssh/id_rsa",
 		},
+		Logger: Logger{
+			LogLevel:  "info",
+			LogFormat: "text",
+		},
 		Server: ServerConfig{
 			Hostname: []string{},
 			Hca:      []string{},
@@ -177,6 +222,13 @@ func (c *Config) ApplyDefaults() {
 	}
 	if c.SSH.PrivateKey == "" {
 		c.SSH.PrivateKey = "~/.ssh/id_rsa"
+	}
+	// Logger defaults
+	if c.Logger.LogLevel == "" {
+		c.Logger.LogLevel = "info"
+	}
+	if c.Logger.LogFormat == "" {
+		c.Logger.LogFormat = "text"
 	}
 }
 
