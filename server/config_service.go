@@ -7,8 +7,12 @@ import (
 	"strings"
 
 	"xnetperf/config"
-	"xnetperf/precheck"
-	"xnetperf/workflow"
+	"xnetperf/internal/script"
+	"xnetperf/internal/service/analyze"
+	"xnetperf/internal/service/collect"
+	"xnetperf/internal/service/precheck"
+	"xnetperf/internal/service/probe"
+	runnerservice "xnetperf/internal/service/runner"
 
 	"github.com/gin-gonic/gin"
 	"gopkg.in/yaml.v3"
@@ -402,7 +406,8 @@ func (s *ConfigService) PrecheckConfig(c *gin.Context) {
 	}
 
 	// 执行 precheck
-	summary, err := precheck.Execute(cfg)
+	checker := precheck.New(cfg)
+	summary, err := checker.DoCheckForAPI(cfg)
 	if err != nil {
 		c.JSON(500, Error(500, fmt.Sprintf("Precheck 执行失败: %v", err)))
 		return
@@ -442,7 +447,8 @@ func (s *ConfigService) RunTest(c *gin.Context) {
 	}
 
 	// 执行测试
-	result, err := workflow.ExecuteRunV1(cfg)
+	runner := runnerservice.New(cfg)
+	result, err := runner.RunAndGetResult(script.TestTypeBandwidth)
 	if err != nil {
 		c.JSON(500, Error(500, fmt.Sprintf("测试运行失败: %v", err)))
 		return
@@ -482,7 +488,8 @@ func (s *ConfigService) ProbeTest(c *gin.Context) {
 	}
 
 	// 执行探测
-	summary, err := workflow.ExecuteProbe(cfg)
+	prober := probe.New(cfg)
+	summary, err := prober.DoProbeAndGetSummary()
 	if err != nil {
 		c.JSON(500, Error(500, fmt.Sprintf("探测执行失败: %v", err)))
 		return
@@ -522,7 +529,8 @@ func (s *ConfigService) CollectReports(c *gin.Context) {
 	}
 
 	// 执行收集
-	result, err := workflow.ExecuteCollect(cfg)
+	collector := collect.New(cfg)
+	result, err := collector.CollectAndGetResult(cfg)
 	if err != nil {
 		c.JSON(500, Error(500, fmt.Sprintf("报告收集失败: %v", err)))
 		return
@@ -562,7 +570,8 @@ func (s *ConfigService) GetReport(c *gin.Context) {
 	}
 
 	// 生成报告
-	report, err := workflow.GenerateReport(cfg)
+	analyzeer := analyze.New(cfg)
+	report, err := analyzeer.GenerateReport()
 	if err != nil {
 		c.JSON(500, Error(500, fmt.Sprintf("报告生成失败: %v", err)))
 		return

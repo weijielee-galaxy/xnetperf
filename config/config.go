@@ -41,6 +41,18 @@ type Config struct {
 	Version            string       `yaml:"version" json:"version"`
 }
 
+func (cfg *Config) ALLHosts() map[string]bool {
+	// 获取所有主机列表
+	allHosts := make(map[string]bool)
+	for _, host := range cfg.Server.Hostname {
+		allHosts[host] = true
+	}
+	for _, host := range cfg.Client.Hostname {
+		allHosts[host] = true
+	}
+	return allHosts
+}
+
 type Report struct {
 	Enable bool   `yaml:"enable" json:"enable"`
 	Dir    string `yaml:"dir" json:"dir"`

@@ -330,6 +330,71 @@ function ConfigEditor({ currentConfig, configData, originalData, loading, onSave
             </SimpleGrid>
           </Box>
 
+          {/* SSH 配置 & Logger 配置 */}
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
+            {/* SSH 配置 */}
+            <Box bg="white" p={6} borderRadius="lg" shadow="sm">
+              <Heading size="md" mb={4} color="teal.600">
+                SSH 配置
+              </Heading>
+              <VStack spacing={4} align="stretch">
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="medium">SSH 用户名</FormLabel>
+                  <Input
+                    size="sm"
+                    value={configData.ssh?.user || ''}
+                    onChange={(e) => updateNestedField('ssh', 'user', e.target.value)}
+                    placeholder="root"
+                  />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="medium">SSH 私钥路径</FormLabel>
+                  <Input
+                    size="sm"
+                    value={configData.ssh?.private_key || ''}
+                    onChange={(e) => updateNestedField('ssh', 'private_key', e.target.value)}
+                    placeholder="~/.ssh/id_rsa"
+                  />
+                </FormControl>
+              </VStack>
+            </Box>
+
+            {/* Logger 配置 */}
+            <Box bg="white" p={6} borderRadius="lg" shadow="sm">
+              <Heading size="md" mb={4} color="blue.600">
+                日志配置
+              </Heading>
+              <VStack spacing={4} align="stretch">
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="medium">日志级别</FormLabel>
+                  <Select
+                    size="sm"
+                    value={configData.logger?.log_level || 'info'}
+                    onChange={(e) => updateNestedField('logger', 'log_level', e.target.value)}
+                  >
+                    <option value="debug">Debug (详细)</option>
+                    <option value="info">Info (信息)</option>
+                    <option value="warn">Warn (警告)</option>
+                    <option value="error">Error (错误)</option>
+                  </Select>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel fontSize="sm" fontWeight="medium">日志格式</FormLabel>
+                  <Select
+                    size="sm"
+                    value={configData.logger?.log_format || 'text'}
+                    onChange={(e) => updateNestedField('logger', 'log_format', e.target.value)}
+                  >
+                    <option value="text">Text (文本格式)</option>
+                    <option value="json">JSON (JSON格式)</option>
+                  </Select>
+                </FormControl>
+              </VStack>
+            </Box>
+          </SimpleGrid>
+
           {/* 报告配置 & 运行配置 */}
           <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
             {/* 报告配置 */}

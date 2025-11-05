@@ -12,7 +12,8 @@ import (
 
 	"xnetperf/config"
 	"xnetperf/internal/script"
-	"xnetperf/internal/service"
+	"xnetperf/internal/service/collect"
+	"xnetperf/internal/service/precheck"
 	"xnetperf/pkg/tools"
 	"xnetperf/stream"
 
@@ -65,7 +66,8 @@ func runLat(cmd *cobra.Command, args []string) {
 
 	// Step 0: Precheck - Verify network card status before starting tests
 	fmt.Println("\n🔍 Step 0/5: Performing network card precheck...")
-	service.DisplayPrecheckResultsV2(service.Precheck(cfg))
+	checker := precheck.New(cfg)
+	checker.Display(checker.DoCheck())
 	fmt.Println("✅ Precheck passed! All network cards are healthy. Proceeding with latency tests...")
 
 	if cfg.Version == "v1" {
@@ -170,7 +172,8 @@ func executeLatencyCollectStep(cfg *config.Config) bool {
 	cleanupRemote = true
 	fmt.Println("Collecting latency report files from remote hosts...")
 
-	if err := execCollectCommand(cfg); err != nil {
+	collector := collect.New(cfg)
+	if err := collector.DoCollect(cleanupRemote); err != nil {
 		fmt.Printf("❌ Error during report collection: %v\n", err)
 		return false
 	}

@@ -7,7 +7,10 @@ import (
 
 	"xnetperf/config"
 	"xnetperf/internal/script"
-	"xnetperf/internal/service"
+	"xnetperf/internal/service/analyze"
+	"xnetperf/internal/service/collect"
+	"xnetperf/internal/service/precheck"
+	"xnetperf/internal/service/probe"
 	v0 "xnetperf/internal/v0"
 
 	"github.com/spf13/cobra"
@@ -91,7 +94,8 @@ func executeRunStep(cfg *config.Config) bool {
 	if cfg.Version == "v1" {
 		// executor 里面没有precheck 先添加在这里
 		fmt.Println("\n🔍 Step 0/5: Performing network card precheck...")
-		service.DisplayPrecheckResultsV2(service.Precheck(cfg))
+		checker := precheck.New(cfg)
+		checker.Display(checker.DoCheck())
 		fmt.Println("✅ Precheck passed! All network cards are healthy. Proceeding with latency tests...")
 
 		executor := script.NewExecutor(cfg, script.TestTypeBandwidth)
@@ -117,7 +121,9 @@ func executeRunStep(cfg *config.Config) bool {
 func executeProbeStep(cfg *config.Config) bool {
 	fmt.Println("Monitoring ib_write_bw processes (5-second intervals)...")
 
-	execProbeCommand(cfg)
+	prober := probe.New(cfg)
+	prober.DoProbeWait(probeInterval)
+
 	return true
 }
 
@@ -131,8 +137,8 @@ func executeCollectStep(cfg *config.Config) bool {
 	// --cleanup=true
 	cleanupRemote = true
 	fmt.Println("Collecting report files from remote hosts...")
-	err := execCollectCommand(cfg)
-	if err != nil {
+	collector := collect.New(cfg)
+	if err := collector.DoCollect(cleanupRemote); err != nil {
 		fmt.Printf("❌ Error during report collection: %v\n", err)
 		return false
 	}
@@ -158,25 +164,8 @@ func executeAnalyzeStep(cfg *config.Config) bool {
 		return false
 	}
 
-	// Handle different stream types with separate analysis functions
-	switch cfg.StreamType {
-	case config.P2P:
-		// P2P analysis
-		p2pData, err := collectP2PReportData(reportsDir, cfg.SSH.PrivateKey, cfg.SSH.User)
-		if err != nil {
-			fmt.Printf("❌ Error collecting P2P report data: %v\n", err)
-			return false
-		}
-		displayP2PResults(p2pData)
-	default:
-		// Traditional fullmesh/incast analysis
-		clientData, serverData, err := collectReportData(reportsDir, cfg)
-		if err != nil {
-			fmt.Printf("❌ Error collecting report data: %v\n", err)
-			return false
-		}
-		displayResults(clientData, serverData, cfg.Speed)
-	}
+	analyzeer := analyze.New(cfg)
+	analyzeer.DoAnalyze(reportsPath, generateMD)
 
 	fmt.Println("✅ Analysis completed successfully")
 	return true

@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"xnetperf/config"
-	"xnetperf/internal/service"
+	"xnetperf/internal/service/precheck"
 	v0 "xnetperf/internal/v0"
 
 	"github.com/spf13/cobra"
@@ -30,15 +29,11 @@ var precheckCmd = &cobra.Command{
 }
 
 func runPrecheck(cmd *cobra.Command, args []string) {
-	cfg, err := config.LoadConfig(cfgFile)
-	if err != nil {
-		fmt.Printf("Error reading config: %v\n", err)
-		return
-	}
+	cfg := GetConfig()
 
 	if cfg.Version == "v1" {
-		precheckResult := service.Precheck(cfg)
-		service.DisplayPrecheckResultsV2(precheckResult)
+		checker := precheck.New(cfg)
+		checker.Display(checker.DoCheck())
 		os.Exit(0)
 	}
 
