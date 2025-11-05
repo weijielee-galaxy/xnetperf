@@ -42,13 +42,9 @@ func runExecute(cmd *cobra.Command, args []string) {
 	fmt.Println(strings.Repeat("=", 60))
 
 	// Load configuration once for all steps
-	cfg, err := config.LoadConfig(cfgFile)
-	if err != nil {
-		fmt.Printf("❌ Error loading config: %v\n", err)
-		os.Exit(1)
-	}
+	cfg := GetConfig()
 
-	// Step 1: Execute run command
+	// Step 1: Execute precheck command
 	fmt.Println("\n📋 Step 1/4: Running network tests...")
 	if !executeRunStep(cfg) {
 		fmt.Println("❌ Run step failed. Aborting workflow.")
@@ -123,7 +119,6 @@ func executeProbeStep(cfg *config.Config) bool {
 
 	prober := probe.New(cfg)
 	prober.DoProbeWait(probeInterval)
-
 	return true
 }
 

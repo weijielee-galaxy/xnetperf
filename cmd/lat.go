@@ -58,11 +58,7 @@ func runLat(cmd *cobra.Command, args []string) {
 	fmt.Println(strings.Repeat("=", 60))
 
 	// Load configuration
-	cfg, err := config.LoadConfig(cfgFile)
-	if err != nil {
-		fmt.Printf("❌ Error loading config: %v\n", err)
-		os.Exit(1)
-	}
+	cfg := GetConfig()
 
 	// Step 0: Precheck - Verify network card status before starting tests
 	fmt.Println("\n🔍 Step 0/5: Performing network card precheck...")

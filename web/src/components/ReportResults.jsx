@@ -200,6 +200,10 @@ function renderTraditionalReport(data) {
                 <Th>主机名</Th>
                 <Th>设备</Th>
                 <Th isNumeric>接收带宽 (Gbps)</Th>
+                <Th isNumeric>理论带宽 (Gbps)</Th>
+                <Th isNumeric>差值 (Gbps)</Th>
+                <Th isNumeric>差值百分比</Th>
+                <Th>状态</Th>
               </Tr>
             </Thead>
             <Tbody>
@@ -212,6 +216,22 @@ function renderTraditionalReport(data) {
                         <Td>{item.hostname}</Td>
                         <Td>{item.device}</Td>
                         <Td isNumeric>{item.rx_bw.toFixed(2)}</Td>
+                        <Td isNumeric>{item.theoretical_bw.toFixed(2)}</Td>
+                        <Td isNumeric>
+                          <Text color={item.delta >= 0 ? 'green.600' : 'red.600'}>
+                            {item.delta.toFixed(2)}
+                          </Text>
+                        </Td>
+                        <Td isNumeric>
+                          <Text color={Math.abs(item.delta_percent) > 20 ? 'red.600' : 'green.600'}>
+                            {item.delta_percent.toFixed(1)}%
+                          </Text>
+                        </Td>
+                        <Td>
+                          <Badge colorScheme={item.status === 'OK' ? 'green' : 'red'}>
+                            {item.status}
+                          </Badge>
+                        </Td>
                       </Tr>
                     )
                   })
