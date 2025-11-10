@@ -14,7 +14,8 @@
 
 ### Web UI
 - [Web UI 快速开始](web-ui-quickstart.md) - Web界面使用入门
-- [HTTP Server API](http-server-api.md) - API接口文档
+- [API 参考文档](api-reference.md) - HTTP Server API 完整参考（详细）
+- [HTTP Server API](http-server-api.md) - API接口文档（概览）
 - [配置验证 API](config-validation-feature.md) - 配置文件验证接口
 
 ---
@@ -23,6 +24,7 @@
 
 - [Precheck 显示架构](precheck-display-architecture.md) - Precheck模块设计（OOP/DTO模式）
 - [Generator IP查找重构](generator-ip-lookup-refactoring.md) - IP查找逻辑重构文档
+- [Web UI 架构文档](web-ui-architecture.md) - 前端架构、数据流和工作流设计（详细）
 
 ---
 
@@ -72,7 +74,7 @@
 | 类别 | 数量 | 说明 |
 |------|------|------|
 | 用户指南 | 7 | 面向最终用户的功能使用文档 |
-| 架构设计 | 2 | 核心设计思想和架构说明 |
+| 架构设计 | 3 | 核心设计思想和架构说明 |
 | 版本发布 | 6 | 版本变更记录和发布说明 |
 | 功能实现 | 9 | 重要功能的实现细节和设计思路 |
 | 问题修复 | 3 | 重要问题的修复记录 |

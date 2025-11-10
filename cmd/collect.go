@@ -37,5 +37,5 @@ Examples:
 }
 
 func init() {
-	collectCmd.Flags().BoolVar(&cleanupRemote, "cleanup", false, "Delete remote report files after successful collection")
+	collectCmd.Flags().BoolVar(&cleanupRemote, "cleanup", true, "Delete remote report files after successful collection")
 }
