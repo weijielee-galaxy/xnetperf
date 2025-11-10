@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+
+	"xnetperf/internal/service/lat"
 	v0 "xnetperf/internal/v0"
 
 	"github.com/spf13/cobra"
@@ -42,8 +46,12 @@ Examples:
 func runLat(cmd *cobra.Command, args []string) {
 	cfg := GetConfig()
 
-	if cfg.Version != "v1" {
-		// TODO
+	if cfg.Version == "v1" {
+		latRunner := lat.New(cfg)
+		if err := latRunner.Execute(); err != nil {
+			fmt.Printf("❌ Latency test failed: %v\n", err)
+			os.Exit(1)
+		}
 	} else {
 		v0.ExecuteLatCommand(cfg)
 	}

@@ -40,18 +40,20 @@ func (s *Server) setupRoutes() {
 		// 配置文件管理API
 		configs := api.Group("/configs")
 		{
-			configs.GET("", s.configService.ListConfigs)                    // 获取配置文件列表
-			configs.GET("/:name", s.configService.GetConfig)                // 获取指定配置文件
-			configs.GET("/:name/preview", s.configService.PreviewConfig)    // 预览配置文件（YAML格式）
-			configs.POST("", s.configService.CreateConfig)                  // 创建配置文件
-			configs.PUT("/:name", s.configService.UpdateConfig)             // 更新配置文件
-			configs.DELETE("/:name", s.configService.DeleteConfig)          // 删除配置文件
-			configs.POST("/:name/validate", s.configService.ValidateConfig) // 验证配置文件
-			configs.POST("/:name/precheck", s.configService.PrecheckConfig) // 执行 precheck 检查
-			configs.POST("/:name/run", s.configService.RunTest)             // 运行测试
-			configs.POST("/:name/probe", s.configService.ProbeTest)         // 探测测试状态
-			configs.POST("/:name/collect", s.configService.CollectReports)  // 收集报告
-			configs.GET("/:name/report", s.configService.GetReport)         // 获取性能报告
+			configs.GET("", s.configService.ListConfigs)                       // 获取配置文件列表
+			configs.GET("/:name", s.configService.GetConfig)                   // 获取指定配置文件
+			configs.GET("/:name/preview", s.configService.PreviewConfig)       // 预览配置文件（YAML格式）
+			configs.POST("", s.configService.CreateConfig)                     // 创建配置文件
+			configs.PUT("/:name", s.configService.UpdateConfig)                // 更新配置文件
+			configs.DELETE("/:name", s.configService.DeleteConfig)             // 删除配置文件
+			configs.POST("/:name/validate", s.configService.ValidateConfig)    // 验证配置文件
+			configs.POST("/:name/precheck", s.configService.PrecheckConfig)    // 执行 precheck 检查
+			configs.POST("/:name/run", s.configService.RunTest)                // 运行测试 (支持 test_type 参数: bandwidth/latency/connectivity)
+			configs.POST("/:name/probe", s.configService.ProbeTest)            // 探测测试状态 (ib_write_bw)
+			configs.POST("/:name/probe-lat", s.configService.ProbeLatencyTest) // 探测延迟测试状态 (ib_write_lat)
+			configs.POST("/:name/collect", s.configService.CollectReports)     // 收集报告
+			configs.GET("/:name/report", s.configService.GetReport)            // 获取性能报告 (带宽测试)
+			configs.GET("/:name/report-lat", s.configService.GetLatencyReport) // 获取延迟测试报告
 		}
 
 		// 字典管理API
@@ -117,13 +119,5 @@ func (s *Server) Start() error {
 	fmt.Printf("HTTP Server starting on http://localhost%s\n", addr)
 	fmt.Println("\n🌐 Web UI:")
 	fmt.Printf("  http://localhost%s/\n", addr)
-	fmt.Println("\n📡 API Endpoints:")
-	fmt.Println("  GET    /health")
-	fmt.Println("  GET    /api/configs")
-	fmt.Println("  GET    /api/configs/:name")
-	fmt.Println("  POST   /api/configs")
-	fmt.Println("  PUT    /api/configs/:name")
-	fmt.Println("  DELETE /api/configs/:name")
-	fmt.Println("  POST   /api/configs/:name/validate")
 	return s.engine.Run(addr)
 }

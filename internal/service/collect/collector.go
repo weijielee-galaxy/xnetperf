@@ -47,13 +47,7 @@ func (c *Collector) DoCollect(cleanupRemote bool) error {
 	}
 
 	// 获取所有主机列表
-	allHosts := make(map[string]bool)
-	for _, host := range c.cfg.Server.Hostname {
-		allHosts[host] = true
-	}
-	for _, host := range c.cfg.Client.Hostname {
-		allHosts[host] = true
-	}
+	allHosts := c.cfg.ALLHosts()
 
 	var wg sync.WaitGroup
 	fmt.Printf("Collecting reports from %d hosts...\n", len(allHosts))

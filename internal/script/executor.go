@@ -30,8 +30,9 @@ const (
 type TestType string
 
 const (
-	TestTypeBandwidth TestType = "bandwidth"
-	TestTypeLatency   TestType = "latency"
+	TestTypeBandwidth    TestType = "bandwidth"
+	TestTypeLatency      TestType = "latency"
+	TestTypeConnectivity TestType = "connectivity"
 )
 
 func (testType TestType) String() string {

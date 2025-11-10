@@ -10,6 +10,7 @@ import (
 	"xnetperf/internal/script"
 	"xnetperf/internal/service/analyze"
 	"xnetperf/internal/service/collect"
+	"xnetperf/internal/service/lat"
 	"xnetperf/internal/service/precheck"
 	"xnetperf/internal/service/probe"
 	runnerservice "xnetperf/internal/service/runner"
@@ -425,6 +426,36 @@ func (s *ConfigService) RunTest(c *gin.Context) {
 		return
 	}
 
+	// 获取请求参数
+	var req struct {
+		TestType string `json:"test_type" form:"test_type"` // bandwidth, latency, connectivity
+	}
+
+	// 尝试绑定 JSON 或 query 参数
+	if err := c.ShouldBindJSON(&req); err != nil {
+		// 如果不是 JSON，尝试从 query 参数获取
+		req.TestType = c.DefaultQuery("test_type", "bandwidth")
+	}
+
+	// 如果 test_type 为空，使用默认值
+	if req.TestType == "" {
+		req.TestType = "bandwidth"
+	}
+
+	// 验证 test_type 参数
+	var testType script.TestType
+	switch req.TestType {
+	case "bandwidth":
+		testType = script.TestTypeBandwidth
+	case "latency":
+		testType = script.TestTypeLatency
+	case "connectivity":
+		testType = script.TestTypeConnectivity
+	default:
+		c.JSON(400, Error(400, fmt.Sprintf("无效的 test_type 参数: %s，可选值: bandwidth, latency, connectivity", req.TestType)))
+		return
+	}
+
 	// 构建文件路径
 	var filePath string
 	if name == DefaultConfigFile {
@@ -448,7 +479,7 @@ func (s *ConfigService) RunTest(c *gin.Context) {
 
 	// 执行测试
 	runner := runnerservice.New(cfg)
-	result, err := runner.RunAndGetResult(script.TestTypeBandwidth)
+	result, err := runner.RunAndGetResult(testType)
 	if err != nil {
 		c.JSON(500, Error(500, fmt.Sprintf("测试运行失败: %v", err)))
 		return
@@ -574,6 +605,88 @@ func (s *ConfigService) GetReport(c *gin.Context) {
 	report, err := analyzeer.GenerateReport()
 	if err != nil {
 		c.JSON(500, Error(500, fmt.Sprintf("报告生成失败: %v", err)))
+		return
+	}
+
+	// 返回结果
+	c.JSON(200, Success(report))
+}
+
+// ProbeLatencyTest 探测延迟测试状态 (ib_write_lat processes)
+func (s *ConfigService) ProbeLatencyTest(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(400, Error(400, "配置文件名不能为空"))
+		return
+	}
+
+	// 构建文件路径
+	var filePath string
+	if name == DefaultConfigFile {
+		filePath = DefaultConfigFile
+	} else {
+		filePath = filepath.Join(ConfigsDir, name)
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(404, Error(404, "配置文件不存在"))
+		return
+	}
+
+	// 加载配置文件
+	cfg, err := config.LoadConfig(filePath)
+	if err != nil {
+		c.JSON(400, Error(400, fmt.Sprintf("配置文件解析失败: %v", err)))
+		return
+	}
+
+	// 执行延迟探测
+	latRunner := lat.New(cfg)
+	summary, err := latRunner.DoLatencyProbeAndGetSummary()
+	if err != nil {
+		c.JSON(500, Error(500, fmt.Sprintf("延迟探测执行失败: %v", err)))
+		return
+	}
+
+	// 返回结果
+	c.JSON(200, Success(summary))
+}
+
+// GetLatencyReport 获取延迟测试报告
+func (s *ConfigService) GetLatencyReport(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(400, Error(400, "配置文件名不能为空"))
+		return
+	}
+
+	// 构建文件路径
+	var filePath string
+	if name == DefaultConfigFile {
+		filePath = DefaultConfigFile
+	} else {
+		filePath = filepath.Join(ConfigsDir, name)
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(404, Error(404, "配置文件不存在"))
+		return
+	}
+
+	// 加载配置文件
+	cfg, err := config.LoadConfig(filePath)
+	if err != nil {
+		c.JSON(400, Error(400, fmt.Sprintf("配置文件解析失败: %v", err)))
+		return
+	}
+
+	// 生成延迟报告
+	latRunner := lat.New(cfg)
+	report, err := latRunner.GenerateLatencyReport()
+	if err != nil {
+		c.JSON(500, Error(500, fmt.Sprintf("延迟报告生成失败: %v", err)))
 		return
 	}
 
