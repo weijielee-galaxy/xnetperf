@@ -1,9 +1,15 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
+	"sync"
+	"xnetperf/internal/tools"
 
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 )
 
@@ -29,9 +35,22 @@ type Config struct {
 	Report             Report       `yaml:"report" json:"report"`
 	Run                Run          `yaml:"run" json:"run"`
 	SSH                SSH          `yaml:"ssh" json:"ssh"`
+	Logger             Logger       `yaml:"logger" json:"logger"`
 	Server             ServerConfig `yaml:"server" json:"server"`
 	Client             ClientConfig `yaml:"client" json:"client"`
 	Version            string       `yaml:"version" json:"version"`
+}
+
+func (cfg *Config) ALLHosts() map[string]bool {
+	// 获取所有主机列表
+	allHosts := make(map[string]bool)
+	for _, host := range cfg.Server.Hostname {
+		allHosts[host] = true
+	}
+	for _, host := range cfg.Client.Hostname {
+		allHosts[host] = true
+	}
+	return allHosts
 }
 
 type Report struct {
@@ -45,7 +64,48 @@ type Run struct {
 }
 
 type SSH struct {
+	User       string `yaml:"user" json:"user"`
 	PrivateKey string `yaml:"private_key" json:"private_key"`
+}
+
+// Logger holds the logger configuration
+type Logger struct {
+	LogLevel  string `yaml:"log_level" json:"log_level"`   // Log level: debug, info, warn, error
+	LogFormat string `yaml:"log_format" json:"log_format"` // Log format: text or json
+}
+
+// IsDebugLevel returns true if log level is debug
+func (l *Logger) IsDebugLevel() bool {
+	return strings.ToLower(l.LogLevel) == "debug"
+}
+
+// IsJSONFormat returns true if log format is json
+func (l *Logger) IsJSONFormat() bool {
+	return strings.ToLower(l.LogFormat) == "json"
+}
+
+// ValidateLogLevel validates if log level is valid
+func (l *Logger) ValidateLogLevel() error {
+	validLevels := map[string]bool{
+		"debug": true,
+		"info":  true,
+		"warn":  true,
+		"error": true,
+	}
+	level := strings.ToLower(l.LogLevel)
+	if !validLevels[level] {
+		return fmt.Errorf("invalid log level '%s', must be one of: debug, info, warn, error", l.LogLevel)
+	}
+	return nil
+}
+
+// ValidateLogFormat validates if log format is valid
+func (l *Logger) ValidateLogFormat() error {
+	format := strings.ToLower(l.LogFormat)
+	if format != "text" && format != "json" {
+		return fmt.Errorf("invalid log format '%s', must be 'text' or 'json'", l.LogFormat)
+	}
+	return nil
 }
 
 // ServerConfig holds the server-specific settings.
@@ -111,7 +171,12 @@ func NewDefaultConfig() *Config {
 			DurationSeconds: 10,
 		},
 		SSH: SSH{
+			User:       "root",
 			PrivateKey: "~/.ssh/id_rsa",
+		},
+		Logger: Logger{
+			LogLevel:  "info",
+			LogFormat: "text",
 		},
 		Server: ServerConfig{
 			Hostname: []string{},
@@ -164,8 +229,18 @@ func (c *Config) ApplyDefaults() {
 		c.Run.DurationSeconds = 10
 	}
 	// SSH defaults
+	if c.SSH.User == "" {
+		c.SSH.User = "root"
+	}
 	if c.SSH.PrivateKey == "" {
 		c.SSH.PrivateKey = "~/.ssh/id_rsa"
+	}
+	// Logger defaults
+	if c.Logger.LogLevel == "" {
+		c.Logger.LogLevel = "info"
+	}
+	if c.Logger.LogFormat == "" {
+		c.Logger.LogFormat = "text"
 	}
 }
 
@@ -193,4 +268,102 @@ func EnsureConfigFile(filePath string) error {
 		fmt.Printf("Created default config file: %s\n", filePath)
 	}
 	return nil
+}
+
+// LookupClientHostsIP retrieves the IP addresses of all client hosts
+func (cfg *Config) LookupClientHostsIP() (map[string]string, error) {
+	ipMap := make(map[string]string)
+	mu := sync.Mutex{}
+
+	g, _ := errgroup.WithContext(context.Background())
+
+	for _, host := range cfg.Client.Hostname {
+		host := host // capture loop variable
+		g.Go(func() error {
+			// Check if host is already an IP address
+			if tools.IsValidIP(host) {
+				mu.Lock()
+				ipMap[host] = host
+				mu.Unlock()
+				return nil
+			}
+
+			ip, err := cfg.getHostIP(host)
+			if err != nil {
+				return err
+			}
+			mu.Lock()
+			ipMap[host] = ip
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	return ipMap, nil
+}
+
+// LookupServerHostsIP retrieves the IP addresses of all server hosts
+func (cfg *Config) LookupServerHostsIP() (map[string]string, error) {
+	ipMap := make(map[string]string)
+	mu := sync.Mutex{}
+
+	g, _ := errgroup.WithContext(context.Background())
+
+	for _, host := range cfg.Server.Hostname {
+		host := host // capture loop variable
+		g.Go(func() error {
+			// Check if host is already an IP address
+			if tools.IsValidIP(host) {
+				mu.Lock()
+				ipMap[host] = host
+				mu.Unlock()
+				return nil
+			}
+
+			ip, err := cfg.getHostIP(host)
+			if err != nil {
+				return err
+			}
+			mu.Lock()
+			ipMap[host] = ip
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+
+	return ipMap, nil
+}
+
+// getHostIP retrieves the IP address of a host using specified network interface
+func (cfg *Config) getHostIP(hostname string) (string, error) {
+	command := fmt.Sprintf(`ip -4 addr show %s | grep -oP '(?<=inet\s)\d+(\.\d+){3}'`, cfg.NetworkInterface)
+
+	sshWrapper := tools.NewSSHWrapper(hostname).
+		User(cfg.SSH.User).
+		PrivateKey(cfg.SSH.PrivateKey).
+		Command(command)
+
+	fmt.Println(sshWrapper.String())
+
+	cmd := exec.Command("bash", "-c", sshWrapper.String())
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("SSH command failed on %s: %v, output: %s", hostname, err, string(output))
+	}
+
+	ip := strings.TrimSpace(string(output))
+	if ip == "" {
+		return "", fmt.Errorf("no IP address found for %s on %s interface", hostname, cfg.NetworkInterface)
+	}
+
+	return ip, nil
 }

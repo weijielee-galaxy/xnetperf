@@ -6,6 +6,12 @@ import (
 	"strings"
 
 	"xnetperf/config"
+	"xnetperf/internal/script"
+	"xnetperf/internal/service/analyze"
+	"xnetperf/internal/service/collect"
+	"xnetperf/internal/service/precheck"
+	"xnetperf/internal/service/probe"
+	v0 "xnetperf/internal/v0"
 
 	"github.com/spf13/cobra"
 )
@@ -28,23 +34,7 @@ Examples:
 
   # Execute with custom config file
   xnetperf execute -c /path/to/config.yaml`,
-	Run: doRunExecute,
-}
-
-func doRunExecute(cmd *cobra.Command, args []string) {
-	cfg, err := config.LoadConfig(cfgFile)
-	if err != nil {
-		fmt.Printf("❌ Error loading config: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println(cfgFile)
-	fmt.Println(cfg.Version, cfg.Version == "v1")
-
-	if cfg.Version == "v1" {
-		runExecuteV1(cmd, args)
-	} else {
-		runExecute(cmd, args)
-	}
+	Run: runExecute,
 }
 
 func runExecute(cmd *cobra.Command, args []string) {
@@ -52,13 +42,9 @@ func runExecute(cmd *cobra.Command, args []string) {
 	fmt.Println(strings.Repeat("=", 60))
 
 	// Load configuration once for all steps
-	cfg, err := config.LoadConfig(cfgFile)
-	if err != nil {
-		fmt.Printf("❌ Error loading config: %v\n", err)
-		os.Exit(1)
-	}
+	cfg := GetConfig()
 
-	// Step 1: Execute run command
+	// Step 1: Execute precheck command
 	fmt.Println("\n📋 Step 1/4: Running network tests...")
 	if !executeRunStep(cfg) {
 		fmt.Println("❌ Run step failed. Aborting workflow.")
@@ -101,7 +87,27 @@ func runExecute(cmd *cobra.Command, args []string) {
 func executeRunStep(cfg *config.Config) bool {
 	fmt.Printf("Executing network tests (stream_type: %s)...\n", cfg.StreamType)
 
-	execRunCommand(cfg)
+	if cfg.Version == "v1" {
+		// executor 里面没有precheck 先添加在这里
+		fmt.Println("\n🔍 Step 0/5: Performing network card precheck...")
+		checker := precheck.New(cfg)
+		checker.Display(checker.DoCheck())
+		fmt.Println("✅ Precheck passed! All network cards are healthy. Proceeding with latency tests...")
+
+		executor := script.NewExecutor(cfg, script.TestTypeBandwidth)
+		if executor == nil {
+			fmt.Println("❌ Unsupported stream type for v1 execute workflow. Aborting.")
+			os.Exit(1)
+		}
+		fmt.Println("\n📋 Step 1/4: Running network tests...")
+		err := executor.Execute()
+		if err != nil {
+			fmt.Printf("❌ Run step failed: %v. Aborting workflow.\n", err)
+			os.Exit(1)
+		}
+	} else {
+		v0.ExecRunCommand(cfg)
+	}
 
 	fmt.Println("✅ Network tests started successfully")
 	return true
@@ -111,7 +117,8 @@ func executeRunStep(cfg *config.Config) bool {
 func executeProbeStep(cfg *config.Config) bool {
 	fmt.Println("Monitoring ib_write_bw processes (5-second intervals)...")
 
-	execProbeCommand(cfg)
+	prober := probe.New(cfg)
+	prober.DoProbeWait(probeInterval)
 	return true
 }
 
@@ -125,8 +132,8 @@ func executeCollectStep(cfg *config.Config) bool {
 	// --cleanup=true
 	cleanupRemote = true
 	fmt.Println("Collecting report files from remote hosts...")
-	err := execCollectCommand(cfg)
-	if err != nil {
+	collector := collect.New(cfg)
+	if err := collector.DoCollect(cleanupRemote); err != nil {
 		fmt.Printf("❌ Error during report collection: %v\n", err)
 		return false
 	}
@@ -152,25 +159,8 @@ func executeAnalyzeStep(cfg *config.Config) bool {
 		return false
 	}
 
-	// Handle different stream types with separate analysis functions
-	switch cfg.StreamType {
-	case config.P2P:
-		// P2P analysis
-		p2pData, err := collectP2PReportData(reportsDir)
-		if err != nil {
-			fmt.Printf("❌ Error collecting P2P report data: %v\n", err)
-			return false
-		}
-		displayP2PResults(p2pData)
-	default:
-		// Traditional fullmesh/incast analysis
-		clientData, serverData, err := collectReportData(reportsDir)
-		if err != nil {
-			fmt.Printf("❌ Error collecting report data: %v\n", err)
-			return false
-		}
-		displayResults(clientData, serverData, cfg.Speed)
-	}
+	analyzeer := analyze.New(cfg)
+	analyzeer.DoAnalyze(reportsPath, generateMD)
 
 	fmt.Println("✅ Analysis completed successfully")
 	return true

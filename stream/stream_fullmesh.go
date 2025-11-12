@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 	"xnetperf/config"
+	"xnetperf/pkg/tools"
 )
 
 // 假设所有的服务器都有同样的HCA数目
@@ -32,7 +33,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 	for _, Server := range allServerHostName {
 		port := cfg.StartPort
 		// 3. Run the command and capture the combined output (stdout and stderr).
-		output, err := getHostIP(Server, cfg.SSH.PrivateKey, cfg.NetworkInterface)
+		output, err := getHostIP(Server, cfg.SSH.PrivateKey, cfg.SSH.User, cfg.NetworkInterface)
 		if err != nil {
 			// If command fails, return the output for debugging and a detailed error.
 			fmt.Printf("Error executing command on %s: %v\nOutput: %s\n", Server, err, string(output))
@@ -114,7 +115,7 @@ func GenerateFullMeshScript(cfg *config.Config) {
 	}
 }
 
-func ClearPreviewScript(hosts []string, sshKeyPath string) {
+func ClearPreviewScript(hosts []string, sshKeyPath, user string) {
 	var wg sync.WaitGroup
 
 	for _, host := range hosts {
@@ -131,7 +132,7 @@ func ClearPreviewScript(hosts []string, sshKeyPath string) {
 			fmt.Printf("-> Sending command to %s...\n", hostname)
 
 			// Create the command: ssh <hostname> "killall ib_write_bw"
-			cmd := buildSSHCommand(hostname, "killall ib_write_bw", sshKeyPath)
+			cmd := tools.BuildSSHCommand(hostname, "killall ib_write_bw", sshKeyPath, user)
 
 			// Run the command and capture the combined standard output and standard error.
 			output, err := cmd.CombinedOutput()
@@ -166,7 +167,7 @@ func DistributeAndRunScripts(cfg *config.Config) {
 	fmt.Println("Distributing and running scripts...")
 	allServerHostName := append(cfg.Server.Hostname, cfg.Client.Hostname...)
 	fmt.Println(allServerHostName)
-	ClearPreviewScript(allServerHostName, cfg.SSH.PrivateKey)
+	ClearPreviewScript(allServerHostName, cfg.SSH.PrivateKey, cfg.SSH.User)
 
 	// 这里是分发和启动脚本的逻辑
 	fmt.Println("Distributing and running scripts...")
@@ -345,7 +346,7 @@ func DistributeAndRunScriptsV1(scripts *ScriptResult, cfg *config.Config) {
 	fmt.Println("Distributing and running scripts...")
 	allServerHostName := append(cfg.Server.Hostname, cfg.Client.Hostname...)
 	fmt.Println(allServerHostName)
-	ClearPreviewScript(allServerHostName, cfg.SSH.PrivateKey)
+	ClearPreviewScript(allServerHostName, cfg.SSH.PrivateKey, cfg.SSH.User)
 
 	swg := &sync.WaitGroup{}
 	for _, sScript := range scripts.ServerScripts {

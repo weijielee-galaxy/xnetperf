@@ -23,7 +23,7 @@ func GenerateIncastScripts(cfg *config.Config) {
 	port := cfg.StartPort
 	for _, sHost := range cfg.Server.Hostname {
 		// 3. Run the command and capture the combined output (stdout and stderr).
-		hostIP, err := getHostIP(sHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
+		hostIP, err := getHostIP(sHost, cfg.SSH.PrivateKey, cfg.SSH.User, cfg.NetworkInterface)
 		if err != nil {
 			// If command fails, return the output for debugging and a detailed error.
 			fmt.Printf("Error executing command on %s: %v\nOutput: %s\n", sHost, err, string(hostIP))
@@ -93,15 +93,18 @@ func GenerateIncastScripts(cfg *config.Config) {
 
 /*
 ServerA
-  - mlx5_0
+  - mlx5_0 2000 2001 2002 2003
+
+ServerB
+  - mlx5_0 2004 2005 2006 2007
 
 ClientA
-  - mlx5_0
-  - mlx5_1
+  - mlx5_0 2000 2004
+  - mlx5_1 2001 2005
 
 ClientB
-  - mlx5_0
-  - mlx5_1
+  - mlx5_0 2002 2006
+  - mlx5_1 2003 2007
 */
 func GenerateIncastScriptsV1(cfg *config.Config) *ScriptResult {
 	sCmdMap := make(map[string][]string) // map: serverHost -> []commands

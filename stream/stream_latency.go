@@ -133,7 +133,7 @@ func calculateTotalLatencyPortsIncast(serverHosts []string, serverHcas []string,
 // Returns the next available port number
 func generateLatencyScriptsForHostFullmesh(currentHost string, allHosts []string, cfg *config.Config, startPort int) (int, error) {
 	// Get IP address for this host
-	output, err := getHostIP(currentHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
+	output, err := getHostIP(currentHost, cfg.SSH.PrivateKey, cfg.SSH.User, cfg.NetworkInterface)
 	if err != nil {
 		return startPort, fmt.Errorf("failed to get IP for %s: %v\nOutput: %s", currentHost, err, string(output))
 	}
@@ -383,7 +383,7 @@ func generateLatencyScriptsForClientIncast(clientHost string, cfg *config.Config
 	// Get IP addresses for all servers
 	serverIPs := make(map[string]string)
 	for _, serverHost := range cfg.Server.Hostname {
-		output, err := getHostIP(serverHost, cfg.SSH.PrivateKey, cfg.NetworkInterface)
+		output, err := getHostIP(serverHost, cfg.SSH.PrivateKey, cfg.SSH.User, cfg.NetworkInterface)
 		if err != nil {
 			return startPort, fmt.Errorf("failed to get IP for server %s: %v\nOutput: %s", serverHost, err, string(output))
 		}
