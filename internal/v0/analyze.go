@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"xnetperf/config"
+	"xnetperf/internal/tools"
 )
 
 // Report represents the structure of a JSON report file
@@ -107,11 +108,9 @@ func getSerialNumberForHost(hostname string, sshKeyPath string, user string) str
 	if user != "" && !strings.Contains(hostname, "@") {
 		hostname = fmt.Sprintf("%s@%s", user, hostname)
 	}
-	if sshKeyPath != "" {
-		cmd = exec.Command("ssh", "-i", sshKeyPath, hostname, "cat /sys/class/dmi/id/product_serial")
-	} else {
-		cmd = exec.Command("ssh", hostname, "cat /sys/class/dmi/id/product_serial")
-	}
+	command := "cat /sys/class/dmi/id/product_serial"
+	sshWrapper := tools.NewSSHWrapper(hostname).Command(command).PrivateKey(sshKeyPath)
+	cmd = exec.Command("bash", "-c", sshWrapper.String())
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "N/A"

@@ -111,7 +111,7 @@ func (w *SSHWrapper) Build() string {
 
 	// Construct host (user@host or just host)
 	host := w.host
-	if w.user != "" {
+	if w.user != "" && !strings.Contains(w.host, "@") {
 		host = fmt.Sprintf("%s@%s", w.user, w.host)
 	}
 	cmd.WriteString(fmt.Sprintf(" %s", host))
