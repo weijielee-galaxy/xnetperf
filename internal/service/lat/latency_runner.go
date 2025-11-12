@@ -213,6 +213,13 @@ func (r *latRunner) runTests() error {
 
 // monitorProgress monitors latency test progress
 func (r *latRunner) monitorProgress() error {
+	return r.MonitorProgressWithTimeout(0) // 0 means no timeout, wait until completion
+}
+
+// MonitorProgressWithTimeout monitors latency test progress with optional timeout
+// If timeoutSeconds is 0, it will wait indefinitely until all processes complete
+// If timeoutSeconds > 0, it will return after timeout even if processes are still running
+func (r *latRunner) MonitorProgressWithTimeout(timeoutSeconds int) error {
 	fmt.Println("Monitoring ib_write_lat processes (5-second intervals)...")
 
 	// Get all hosts list
@@ -223,10 +230,15 @@ func (r *latRunner) monitorProgress() error {
 	}
 
 	fmt.Printf("Probing ib_write_lat processes on %d hosts...\n", len(allHosts))
-	fmt.Println("Mode: Continuous monitoring until all processes complete")
+	if timeoutSeconds > 0 {
+		fmt.Printf("Mode: Monitoring with %d seconds timeout\n", timeoutSeconds)
+	} else {
+		fmt.Println("Mode: Continuous monitoring until all processes complete")
+	}
 	fmt.Println()
 
 	probeIntervalSec := 5
+	startTime := time.Now()
 
 	for {
 		results := r.probeLatencyAllHosts(allHosts)
@@ -244,6 +256,15 @@ func (r *latRunner) monitorProgress() error {
 		if allCompleted {
 			fmt.Println("✅ All ib_write_lat processes have completed!")
 			break
+		}
+
+		// Check timeout
+		if timeoutSeconds > 0 {
+			elapsed := int(time.Since(startTime).Seconds())
+			if elapsed >= timeoutSeconds {
+				fmt.Printf("⏱️  Timeout reached (%d seconds). Some processes may still be running.\n", timeoutSeconds)
+				break
+			}
 		}
 
 		// Wait for next probe
@@ -309,6 +330,11 @@ func (r *latRunner) analyzeAndDisplay() error {
 
 // collectLatencyReportData parses all latency JSON reports
 func (r *latRunner) collectLatencyReportData(reportsDir string) ([]LatencyData, error) {
+	return r.ParseLatencyReportsFromDir(reportsDir)
+}
+
+// ParseLatencyReportsFromDir parses all latency JSON reports from a directory (public method for reuse)
+func (r *latRunner) ParseLatencyReportsFromDir(reportsDir string) ([]LatencyData, error) {
 	var latencyData []LatencyData
 
 	// Walk through all JSON files in reports directory
@@ -414,6 +440,8 @@ func (r *latRunner) parseLatencyReport(filePath string) (*LatencyData, error) {
 	}
 
 	avgLatency := report.Results.TAvg
+	minLatency := report.Results.TMin
+	maxLatency := report.Results.TMax
 
 	latencyData := &LatencyData{
 		SourceHost:   sourceHost,
@@ -421,6 +449,8 @@ func (r *latRunner) parseLatencyReport(filePath string) (*LatencyData, error) {
 		TargetHost:   targetHost,
 		TargetHCA:    targetHCA,
 		AvgLatencyUs: avgLatency,
+		MinLatencyUs: minLatency,
+		MaxLatencyUs: maxLatency,
 	}
 
 	return latencyData, nil

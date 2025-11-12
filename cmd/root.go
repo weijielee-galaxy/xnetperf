@@ -62,5 +62,6 @@ func Execute() {
 	rootCmd.AddCommand(probeCmd)
 	rootCmd.AddCommand(executeCmd)
 	rootCmd.AddCommand(latCmd)
+	rootCmd.AddCommand(checkConnCmd)
 	_ = rootCmd.Execute()
 }

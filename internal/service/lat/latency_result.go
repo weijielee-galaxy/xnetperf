@@ -7,6 +7,8 @@ type LatencyData struct {
 	TargetHost   string  `json:"target_host"`
 	TargetHCA    string  `json:"target_hca"`
 	AvgLatencyUs float64 `json:"avg_latency_us"` // Average latency in microseconds
+	MinLatencyUs float64 `json:"min_latency_us"` // Minimum latency in microseconds
+	MaxLatencyUs float64 `json:"max_latency_us"` // Maximum latency in microseconds
 }
 
 // LatencySummary is the complete latency report for API responses
@@ -36,6 +38,8 @@ type LatencyStats struct {
 type LatencyReport struct {
 	Results struct {
 		TAvg float64 `json:"t_avg"` // Average latency in microseconds
+		TMin float64 `json:"t_min"` // Minimum latency in microseconds
+		TMax float64 `json:"t_max"` // Maximum latency in microseconds
 	} `json:"results"`
 }
 

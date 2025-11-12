@@ -10,6 +10,7 @@ import (
 	"xnetperf/internal/script"
 	"xnetperf/internal/service/analyze"
 	"xnetperf/internal/service/collect"
+	"xnetperf/internal/service/connectivity"
 	"xnetperf/internal/service/lat"
 	"xnetperf/internal/service/precheck"
 	"xnetperf/internal/service/probe"
@@ -301,6 +302,11 @@ func (s *ConfigService) ValidateConfig(c *gin.Context) {
 
 	// 验证必要字段
 	var validationErrors []string
+
+	// 检查 version
+	if cfg.Version == "" {
+		validationErrors = append(validationErrors, "version 不能为空")
+	}
 
 	// 检查 server 配置
 	if len(cfg.Server.Hostname) == 0 {
@@ -692,4 +698,45 @@ func (s *ConfigService) GetLatencyReport(c *gin.Context) {
 
 	// 返回结果
 	c.JSON(200, Success(report))
+}
+
+// CheckConnectivity 检查网络连通性
+func (s *ConfigService) CheckConnectivity(c *gin.Context) {
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(400, Error(400, "配置文件名不能为空"))
+		return
+	}
+
+	// 构建文件路径
+	var filePath string
+	if name == DefaultConfigFile {
+		filePath = DefaultConfigFile
+	} else {
+		filePath = filepath.Join(ConfigsDir, name)
+	}
+
+	// 检查文件是否存在
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(404, Error(404, "配置文件不存在"))
+		return
+	}
+
+	// 加载配置文件
+	cfg, err := config.LoadConfig(filePath)
+	if err != nil {
+		c.JSON(400, Error(400, fmt.Sprintf("配置文件解析失败: %v", err)))
+		return
+	}
+
+	// 执行连通性检查
+	checker := connectivity.New(cfg)
+	summary, err := checker.CheckConnectivity()
+	if err != nil {
+		c.JSON(500, Error(500, fmt.Sprintf("连通性检查失败: %v", err)))
+		return
+	}
+
+	// 返回结果
+	c.JSON(200, Success(summary))
 }

@@ -3,9 +3,11 @@ package server
 import (
 	"fmt"
 	"io/fs"
+	"time"
 
 	"xnetperf/web"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,8 +23,20 @@ type Server struct {
 func NewServer(port int) *Server {
 	gin.SetMode(gin.ReleaseMode)
 
+	engine := gin.Default()
+
+	// 配置 CORS 中间件
+	engine.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"}, // 允许所有源，生产环境建议配置具体的域名
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	server := &Server{
-		engine:            gin.Default(),
+		engine:            engine,
 		configService:     NewConfigService(),
 		dictionaryService: NewDictionaryService(),
 		port:              port,
@@ -40,20 +54,21 @@ func (s *Server) setupRoutes() {
 		// 配置文件管理API
 		configs := api.Group("/configs")
 		{
-			configs.GET("", s.configService.ListConfigs)                       // 获取配置文件列表
-			configs.GET("/:name", s.configService.GetConfig)                   // 获取指定配置文件
-			configs.GET("/:name/preview", s.configService.PreviewConfig)       // 预览配置文件（YAML格式）
-			configs.POST("", s.configService.CreateConfig)                     // 创建配置文件
-			configs.PUT("/:name", s.configService.UpdateConfig)                // 更新配置文件
-			configs.DELETE("/:name", s.configService.DeleteConfig)             // 删除配置文件
-			configs.POST("/:name/validate", s.configService.ValidateConfig)    // 验证配置文件
-			configs.POST("/:name/precheck", s.configService.PrecheckConfig)    // 执行 precheck 检查
-			configs.POST("/:name/run", s.configService.RunTest)                // 运行测试 (支持 test_type 参数: bandwidth/latency/connectivity)
-			configs.POST("/:name/probe", s.configService.ProbeTest)            // 探测测试状态 (ib_write_bw)
-			configs.POST("/:name/probe-lat", s.configService.ProbeLatencyTest) // 探测延迟测试状态 (ib_write_lat)
-			configs.POST("/:name/collect", s.configService.CollectReports)     // 收集报告
-			configs.GET("/:name/report", s.configService.GetReport)            // 获取性能报告 (带宽测试)
-			configs.GET("/:name/report-lat", s.configService.GetLatencyReport) // 获取延迟测试报告
+			configs.GET("", s.configService.ListConfigs)                           // 获取配置文件列表
+			configs.GET("/:name", s.configService.GetConfig)                       // 获取指定配置文件
+			configs.GET("/:name/preview", s.configService.PreviewConfig)           // 预览配置文件（YAML格式）
+			configs.POST("", s.configService.CreateConfig)                         // 创建配置文件
+			configs.PUT("/:name", s.configService.UpdateConfig)                    // 更新配置文件
+			configs.DELETE("/:name", s.configService.DeleteConfig)                 // 删除配置文件
+			configs.POST("/:name/validate", s.configService.ValidateConfig)        // 验证配置文件
+			configs.POST("/:name/precheck", s.configService.PrecheckConfig)        // 执行 precheck 检查
+			configs.POST("/:name/run", s.configService.RunTest)                    // 运行测试 (支持 test_type 参数: bandwidth/latency/connectivity)
+			configs.POST("/:name/probe", s.configService.ProbeTest)                // 探测测试状态 (ib_write_bw)
+			configs.POST("/:name/probe-lat", s.configService.ProbeLatencyTest)     // 探测延迟测试状态 (ib_write_lat)
+			configs.POST("/:name/collect", s.configService.CollectReports)         // 收集报告
+			configs.GET("/:name/report", s.configService.GetReport)                // 获取性能报告 (带宽测试)
+			configs.GET("/:name/report-lat", s.configService.GetLatencyReport)     // 获取延迟测试报告
+			configs.POST("/:name/connectivity", s.configService.CheckConnectivity) // 检查网络连通性
 		}
 
 		// 字典管理API
